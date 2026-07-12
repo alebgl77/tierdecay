@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Shellcheck & repo structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shellcheck the installer
+        run: shellcheck -S warning install.sh
+
+      - name: Required files present
+        run: |
+          set -euo pipefail
+          req=(README.md LICENSE CONTRIBUTING.md CODE_OF_CONDUCT.md \
+               core/SPEC.md core/ledger.template.md core/playbook.template.md install.sh)
+          for f in "${req[@]}"; do
+            [ -f "$f" ] || { echo "::error::missing required file $f"; exit 1; }
+          done
+          echo "All required files present."
+
+      - name: Every adapter is complete
+        run: |
+          set -euo pipefail
+          for d in adapters/*/; do
+            [ -f "${d}README.md" ] || { echo "::error::${d} has no README.md"; exit 1; }
+            if ! ls "${d}"*.md >/dev/null 2>&1; then
+              echo "::error::${d} ships no native context file"; exit 1
+            fi
+          done
+          echo "All adapters complete."
+
+      - name: README asset links resolve
+        run: |
+          set -euo pipefail
+          for a in $(grep -oE 'assets/[A-Za-z0-9._/-]+\.(png|gif|svg|jpe?g)' README.md | sort -u); do
+            [ -f "$a" ] || { echo "::error::README references missing asset $a"; exit 1; }
+          done
+          echo "All README asset links resolve."
+
+      - name: Installer is executable
+        run: |
+          set -euo pipefail
+          [ -x install.sh ] || { echo "::error::install.sh is not executable (chmod +x)"; exit 1; }
+          echo "install.sh is executable."

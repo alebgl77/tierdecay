@@ -1,0 +1,69 @@
+name: Bug report
+description: Report incorrect routing, protocol, or adapter behaviour in TierDecay.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. TierDecay is a set of markdown files plus a protocol — there is no
+        daemon or SDK, so most bugs are reproducible from your state files (SPEC, ledger, playbook)
+        and the exact CLI/model binding you used. Please include those below.
+
+        Do not paste secrets or API keys. Redact anything sensitive in your ledger/playbook excerpts.
+  - type: dropdown
+    id: adapter
+    attributes:
+      label: Adapter
+      description: Which adapter were you running?
+      options:
+        - claude-code
+        - agents-md
+        - gemini-cli
+        - aider
+        - core/other
+    validations:
+      required: true
+  - type: input
+    id: cli-and-models
+    attributes:
+      label: CLI + models
+      description: >
+        Which CLI, and which concrete models are bound to the tiers?
+        Give the frontier / strong / fast / cheapest mapping (T3 / T2 / T1 / T0).
+      placeholder: "e.g. Claude Code — T3 claude-fable-5 / T2 claude-opus-4-8 / T1 claude-sonnet-4-6 / T0 claude-haiku-4-5"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Describe the actual behaviour, including any incorrect tier probe, ledger write, or playbook entry.
+    validations:
+      required: true
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to reproduce
+      description: >
+        Exact steps. Include the relevant SPEC/ledger/playbook state and the task you gave the
+        orchestrator, so the routing decision can be reproduced.
+      placeholder: |
+        1. Install adapter X into repo Y
+        2. Give the orchestrator task Z with this ledger/playbook state ...
+        3. Observe the probe tier / write ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behaviour
+    attributes:
+      label: Expected behaviour
+      description: What should the router / protocol have done instead?
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmation
+      options:
+        - label: I have searched existing issues and this has not already been reported.
+          required: true

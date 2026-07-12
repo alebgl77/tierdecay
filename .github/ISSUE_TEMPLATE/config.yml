@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discussions (questions, ledger sharing, ideas)
+    url: https://github.com/alebgl77/tierdecay/discussions
+    about: Ask questions, share your ledger, or discuss routing strategy before filing an issue.
+  - name: Contributing guide
+    url: https://github.com/alebgl77/tierdecay/blob/main/CONTRIBUTING.md
+    about: How to propose adapters, protocol changes, and open pull requests.

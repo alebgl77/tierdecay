@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "TierDecay"
+abstract: >-
+  A self-distilling model router for AI coding CLIs that solves each
+  problem-class once at an expensive model tier, compiles the solution into
+  a playbook entry, and routes subsequent occurrences of that class to
+  progressively cheaper tiers based on an empirical ledger of predicted
+  versus executed outcomes.
+authors:
+  - family-names: "Beguel"
+    given-names: "Alexandre"
+version: 0.1.0
+date-released: "2026-07-12"
+license: MIT
+repository-code: "https://github.com/alebgl77/tierdecay"
+url: "https://github.com/alebgl77/tierdecay"
+keywords:
+  - llm-routing
+  - ai-agents
+  - claude-code
+  - agents-md
+  - developer-tools
+  - model-routing
+  - in-context-distillation

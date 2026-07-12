@@ -1,0 +1,51 @@
+name: Adapter request
+description: Request (or offer) support for another CLI / agent runtime.
+labels: [adapter]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        An adapter maps TierDecay's four tiers (T3 frontier / T2 strong / T1 fast / T0 cheapest) onto a
+        specific CLI's native context file and model-switching mechanism. The more precisely you can
+        describe that mapping, the faster the adapter can be written or reviewed.
+  - type: input
+    id: cli-agent
+    attributes:
+      label: Which CLI / agent
+      description: The tool you want an adapter for.
+      placeholder: "e.g. Amp, Continue, Cline, Crush ..."
+    validations:
+      required: true
+  - type: input
+    id: context-file
+    attributes:
+      label: Native context file name
+      description: The file the CLI already reads for project instructions.
+      placeholder: "e.g. AGENTS.md, GEMINI.md, CONVENTIONS.md"
+    validations:
+      required: false
+  - type: textarea
+    id: model-tiers
+    attributes:
+      label: Model tiers available
+      description: >
+        What maps to T3 / T2 / T1 / T0 on this CLI, and how does the CLI switch models mid-session
+        (per-agent binding, a slash command, a config flag, an env var)?
+      placeholder: |
+        T3 -> ...
+        T2 -> ...
+        T1 -> ...
+        T0 -> ...
+        Switching mechanism: ...
+    validations:
+      required: false
+  - type: dropdown
+    id: willing-to-pr
+    attributes:
+      label: Are you willing to open the PR?
+      options:
+        - Yes
+        - Maybe, with guidance
+        - "No, requesting"
+    validations:
+      required: true

@@ -1,0 +1,17 @@
+# Normalize all text files to LF, both in the working tree and in the repo.
+* text=auto eol=lf
+
+# Force shell scripts to LF even on platforms/configs that would otherwise
+# check them out with CRLF.
+*.sh text eol=lf
+
+# Binary assets: do not diff, do not normalize line endings.
+*.png binary
+*.gif binary
+*.jpg binary
+*.jpeg binary
+*.svg binary
+
+# Let GitHub Linguist count markdown as documentation rather than code,
+# so language stats reflect the shell/config nature of this repo.
+*.md linguist-documentation
