@@ -223,16 +223,10 @@ expensive reasoning compiled into instructions a cheaper model can follow.
 Adapters wanted: Qwen Code, Goose, Cline, Windsurf, Amp. One folder, one
 context file, one README — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Star history
-
-<a href="https://star-history.com/#alebgl77/tierdecay&Date">
-  <img src="https://api.star-history.com/svg?repos=alebgl77/tierdecay&type=Date" alt="TierDecay star history" width="640" />
-</a>
-
 ---
 
 <div align="center">
 
-**If your ledger drifted toward T1 this week, that's a star's worth of tokens. ⭐**
+**If your ledger drifted toward the cheap tier this week, TierDecay did its job.**
 
 </div>

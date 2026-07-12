@@ -35,19 +35,18 @@ Anti-poisoning defenses (the failure mode of any self-modifying system):
 2. Requires a plan/org with Fable 5 access — check with `/model`.
 3. Start `claude`: the main thread runs Fable 5 via `.claude/settings.json`.
    Per-session override: `/model fable`.
-4. Enable extended thinking in the session (Tab). Since Claude Code v2.1.198,
-   subagents inherit the main conversation's thinking configuration.
+4. Enable extended thinking in the session (Tab); in current Claude Code
+   versions subagents inherit the main conversation's thinking configuration.
 
 ## Verify
 - `/agents` should list: scout, executor, heavy-executor, oracle.
 - Ask for a multi-step feature. Expected behavior: scout recon → plan with
   [T1]/[T2]/[T3] tags → dispatch → verification → oracle review on critical
   diffs.
-- Some builds have had a bug where the frontmatter `model:` field is ignored
-  and subagents inherit the parent model. If you see everything running on
-  Fable, add one line to CLAUDE.md: "when dispatching, pass the model
-  explicitly in the Agent call." Do NOT use `CLAUDE_CODE_SUBAGENT_MODEL` —
-  it overrides ALL subagents to a single model and destroys the tiering.
+- If every subagent runs on the frontier model, the per-agent `model:`
+  binding isn't taking effect — name the model explicitly when you dispatch
+  (pass it in the Agent call). Avoid `CLAUDE_CODE_SUBAGENT_MODEL`: it forces
+  ALL subagents onto one model and destroys the tiering.
 
 ## Tuning
 - Scout runs on Haiku for cheap recon (same pattern as the built-in Explore
