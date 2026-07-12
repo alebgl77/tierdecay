@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning][semver].
 
 ### Added
 
+- `cline`, `goose`, and `windsurf` adapters — each ships an `AGENTS.md` mapped
+  to the tool's native model controls (Cline Plan/Act, Goose `/plan` planner
+  model, Windsurf per-message model picker) — plus their `install.sh` cases.
+  Built by dogfooding TierDecay on itself; the real routing ledger from that
+  session is in `examples/self-build/`.
+
 ### Changed
 
 ### Deprecated

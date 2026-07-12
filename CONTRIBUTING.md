@@ -20,7 +20,8 @@ is welcome.
 
 ## Add an adapter
 
-**Adapters wanted:** Qwen Code, Goose, Cline, Windsurf, Amp, Continue.
+**Adapters wanted:** Qwen Code, Amp, Continue, Cody. (Cline, Goose, and
+Windsurf now ship in-tree — use them as worked examples.)
 
 An adapter is one folder under `adapters/` containing:
 

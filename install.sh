@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # TierDecay installer — run from the repo you want to equip:
-#   /path/to/tierdecay/install.sh <claude|agents|gemini|aider|auto>
+#   /path/to/tierdecay/install.sh <claude|agents|gemini|aider|cline|goose|windsurf|auto>
 set -euo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -59,7 +59,11 @@ case "$TARGET" in
     seed_state
     printf '\nrun:\n  aider --architect --model <frontier> --editor-model <cheap> --read CONVENTIONS.md\n'
     ;;
-  *) die "unknown target '$TARGET' (claude|agents|gemini|aider|auto)";;
+  cline|goose|windsurf)
+    copy_safe "$SRC/adapters/$TARGET/AGENTS.md" "$DEST/AGENTS.md"
+    seed_state
+    ;;
+  *) die "unknown target '$TARGET' (claude|agents|gemini|aider|cline|goose|windsurf|auto)";;
 esac
 
 say "TierDecay installed — first high-tier solve starts the decay."

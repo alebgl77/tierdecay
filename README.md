@@ -20,6 +20,9 @@
 ![Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-GEMINI.md-4285F4)
 ![Aider](https://img.shields.io/badge/Aider-architect%2Feditor-2ea043)
 ![OpenCode](https://img.shields.io/badge/OpenCode-AGENTS.md-orange)
+![Cline](https://img.shields.io/badge/Cline-plan%2Fact-2ea043)
+![Goose](https://img.shields.io/badge/Goose-AGENTS.md-00b3a4)
+![Windsurf](https://img.shields.io/badge/Windsurf-AGENTS.md-06b6d4)
 
 <br/>
 
@@ -191,6 +194,17 @@ the playbook, and the decay rules on top. See
 [`adapters/aider/`](adapters/aider/).
 </details>
 
+<details>
+<summary><b>Cline · Goose · Windsurf</b> (AGENTS.md + native model binding)</summary>
+
+Each ships an `AGENTS.md` these tools read natively, mapped to their own model
+controls: **Cline** binds T3 → Plan-mode model, T1 → Act-mode model;
+**Goose** binds T3 → the `/plan` planner model, T1/T2 → the default
+`GOOSE_MODEL`; **Windsurf** runs single-agent phase mode via its per-message
+model picker. See [`adapters/cline/`](adapters/cline/),
+[`adapters/goose/`](adapters/goose/), [`adapters/windsurf/`](adapters/windsurf/).
+</details>
+
 ## What TierDecay is not
 
 - **Not a proxy or a router daemon.** Zero infrastructure. It's markdown, a
@@ -220,7 +234,7 @@ expensive reasoning compiled into instructions a cheaper model can follow.
 
 ## Contributing
 
-Adapters wanted: Qwen Code, Goose, Cline, Windsurf, Amp. One folder, one
+Adapters wanted: Qwen Code, Amp, Continue, Cody. One folder, one
 context file, one README — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
