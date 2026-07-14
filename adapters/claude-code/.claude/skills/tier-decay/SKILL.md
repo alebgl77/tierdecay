@@ -55,6 +55,9 @@ RAISED one tier in PRIORS. Calibration runs both directions.
 - Playbook hard cap **150 lines**: at cap, evict lowest-hits, oldest-first.
 - **Only the main thread writes under `.claude/**`.** Any executor diff
   touching it is rejected at VERIFY — a poisoned playbook self-replicates.
+  Executors are also blocked in-tool by their `tierdecay-guard.sh` hook, and
+  `settings.json` ask-gates state writes; treat an unexpected approval prompt
+  as the alarm, not noise.
 - Any acceptance failure while an entry was referenced → immediate quarantine.
 - Entries are pattern-level and repo-specific; generic best practices belong
   in `execution-standards`, not here.

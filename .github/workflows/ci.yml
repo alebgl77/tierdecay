@@ -67,6 +67,12 @@ jobs:
             || { echo "::error::reinstall clobbered .claude/routing-ledger.md"; exit 1; }
           [ -f "$tmp/.claude/routing-ledger.md.tierdecay" ] \
             || { echo "::error::expected a .tierdecay sidecar on collision"; exit 1; }
+          # A reinstall must also never replace a user's hardened settings.json
+          # (e.g. permissions/hooks) with the shipped default.
+          printf '{"model":"fable","permissions":{"deny":["WebFetch"]}}\n' > "$tmp/.claude/settings.json"
+          (cd "$tmp" && "$GITHUB_WORKSPACE/install.sh" claude)
+          grep -q '"deny"' "$tmp/.claude/settings.json" \
+            || { echo "::error::reinstall clobbered a hardened .claude/settings.json"; exit 1; }
           tmp2="$(mktemp -d)"
           (cd "$tmp2" && "$GITHUB_WORKSPACE/install.sh" agents)
           echo "LEARNED-STATE-MARKER" >> "$tmp2/.tierdecay/ledger.md"
@@ -74,3 +80,23 @@ jobs:
           grep -q "LEARNED-STATE-MARKER" "$tmp2/.tierdecay/ledger.md" \
             || { echo "::error::reinstall clobbered .tierdecay/ledger.md"; exit 1; }
           echo "Idempotence OK: learned state preserved, sidecars written."
+
+      - name: Claude adapter enforcement is intact
+        run: |
+          set -euo pipefail
+          g="adapters/claude-code/.claude/hooks/tierdecay-guard.sh"
+          [ -x "$g" ] || { echo "::error::$g missing or not executable"; exit 1; }
+          shellcheck -S warning "$g"
+          python3 -c "import json; json.load(open('adapters/claude-code/.claude/settings.json'))"
+          grep -q "tierdecay-guard.sh" adapters/claude-code/.claude/agents/executor.md \
+            || { echo "::error::executor.md lost its guard hook"; exit 1; }
+          grep -q "tierdecay-guard.sh" adapters/claude-code/.claude/agents/heavy-executor.md \
+            || { echo "::error::heavy-executor.md lost its guard hook"; exit 1; }
+          grep -q 'Edit(.claude/\*\*)' adapters/claude-code/.claude/settings.json \
+            || { echo "::error::settings.json lost its ask rules"; exit 1; }
+          if echo '{"tool_name":"Write","tool_input":{"file_path":".tierdecay/playbook.md"}}' | "$g" 2>/dev/null; then
+            echo "::error::guard failed to block a state write"; exit 1
+          fi
+          echo '{"tool_name":"Write","tool_input":{"file_path":"src/app.py"}}' | "$g" \
+            || { echo "::error::guard blocked a legitimate write"; exit 1; }
+          echo "Enforcement intact: guard blocks state writes, passes normal ones."

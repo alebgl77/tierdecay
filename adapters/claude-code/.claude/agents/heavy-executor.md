@@ -6,6 +6,12 @@ model: opus
 skills:
   - execution-standards
   - repo-playbook
+hooks:
+  PreToolUse:
+    - matcher: "Write|Edit|MultiEdit|NotebookEdit|Bash"
+      hooks:
+        - type: command
+          command: ".claude/hooks/tierdecay-guard.sh"
 ---
 
 You handle execution where correctness is subtle and mistakes are expensive.

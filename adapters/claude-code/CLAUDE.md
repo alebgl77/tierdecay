@@ -50,7 +50,9 @@ exploration — subagents exist for that.
 - Borderline routing: default DOWN one tier when existing tests are strong,
   UP when the task sits on a critical path or unfamiliar ground.
 - Only the main thread writes under `.claude/**`. Reject at VERIFY any
-  executor diff touching it — a poisoned playbook self-replicates.
+  executor diff touching it — a poisoned playbook self-replicates. (Executors
+  are also hard-blocked by their PreToolUse guard hook, and state writes are
+  ask-gated in `settings.json` — expect one approval per DISTILL.)
 - Protect your context: demand summaries from subagents, never raw logs. If
   you're about to read a 5th file or write >30 lines of routine code, stop —
   that's a dispatch.

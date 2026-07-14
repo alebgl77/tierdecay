@@ -38,6 +38,24 @@ Anti-poisoning defenses (the failure mode of any self-modifying system):
 4. Enable extended thinking in the session (Tab); in current Claude Code
    versions subagents inherit the main conversation's thinking configuration.
 
+## State-write enforcement
+
+SPEC §5's "only the orchestrator writes state" is enforced in the tool layer
+here, not just in the prompt:
+
+- `executor` and `heavy-executor` carry a `PreToolUse` hook
+  (`.claude/hooks/tierdecay-guard.sh`) that blocks any of their
+  Write/Edit/Bash calls referencing `.claude/` or `.tierdecay/` — prompt
+  injection included. `scout` is read-only by tool grant.
+- `settings.json` `ask`-gates `Edit(.claude/**)` and `Edit(.tierdecay/**)`:
+  every surviving state write — including the orchestrator's own DISTILL —
+  asks for your approval. One click per task close; an unexpected approval
+  prompt is your injection alarm. Prefer protocol-only enforcement? Remove
+  the `ask` rules — but then the invariants rest on the prompt alone.
+
+Note: per-agent `hooks` frontmatter applies to project agents like these;
+Claude Code ignores it for agents loaded from plugins.
+
 ## Verify
 - `/agents` should list: scout, executor, heavy-executor, oracle.
 - Ask for a multi-step feature. Expected behavior: scout recon → plan with

@@ -1,3 +1,9 @@
 {
-  "model": "fable"
+  "model": "fable",
+  "permissions": {
+    "ask": [
+      "Edit(.claude/**)",
+      "Edit(.tierdecay/**)"
+    ]
+  }
 }

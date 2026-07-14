@@ -21,6 +21,23 @@ and this project adheres to [Semantic Versioning][semver].
 
 ### Removed
 
+### Security
+
+- Claude Code adapter: SPEC §5 invariant 1 ("only the orchestrator writes
+  state") is now enforced at the tool layer, not just in the prompt —
+  `executor` and `heavy-executor` carry a `PreToolUse` guard hook
+  (`.claude/hooks/tierdecay-guard.sh`) that blocks their calls referencing
+  `.claude/` or `.tierdecay/`, and `settings.json` `ask`-gates all remaining
+  state writes behind human approval. CI verifies the guard's behaviour.
+- README/SECURITY.md: the anti-poisoning FAQ no longer claims impossibility
+  ("it can't write") — defenses are documented as explicit layers (protocol,
+  tool-layer enforcement, human review) with the residual risk stated.
+- SECURITY.md: new "Distribution and shared-repo surface" section — install
+  from tagged releases verified against the `SHA256SUMS` asset (shipped from
+  v0.1.0), and an explicit commit-vs-ignore policy choice for shared
+  `.tierdecay/` state (a committed playbook is a shared attack surface;
+  review its diffs like code).
+
 ### Fixed
 
 - `install.sh` (claude target): replaced `cp -rn || cp -r` with a

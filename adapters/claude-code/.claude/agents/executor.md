@@ -6,6 +6,12 @@ model: sonnet
 skills:
   - execution-standards
   - repo-playbook
+hooks:
+  PreToolUse:
+    - matcher: "Write|Edit|MultiEdit|NotebookEdit|Bash"
+      hooks:
+        - type: command
+          command: ".claude/hooks/tierdecay-guard.sh"
 ---
 
 You implement exactly what the brief specifies — nothing more, nothing less.
