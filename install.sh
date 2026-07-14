@@ -41,9 +41,17 @@ detect() {
 case "$TARGET" in
   claude)
     copy_safe "$SRC/adapters/claude-code/CLAUDE.md" "$DEST/CLAUDE.md"
-    mkdir -p "$DEST/.claude"
-    cp -rn "$SRC/adapters/claude-code/.claude/." "$DEST/.claude/" 2>/dev/null || \
-      cp -r "$SRC/adapters/claude-code/.claude/." "$DEST/.claude/"
+    # File-by-file through copy_safe: existing files (ledger, playbook,
+    # settings) are NEVER clobbered — the incoming version lands as a
+    # .tierdecay sidecar to merge. Do not "simplify" this back to
+    # `cp -rn || cp -r`: on coreutils >= 9.2, `cp -n` exits nonzero when it
+    # skips an existing file, which used to trigger the clobbering fallback
+    # and silently destroy the learned state.
+    find "$SRC/adapters/claude-code/.claude" -type f | while IFS= read -r f; do
+      rel="${f#"$SRC/adapters/claude-code/"}"
+      mkdir -p "$DEST/$(dirname "$rel")"
+      copy_safe "$f" "$DEST/$rel"
+    done
     say "installed .claude/ (agents, skills, settings, ledger)"
     ;;
   agents)

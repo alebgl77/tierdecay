@@ -52,3 +52,25 @@ jobs:
           set -euo pipefail
           [ -x install.sh ] || { echo "::error::install.sh is not executable (chmod +x)"; exit 1; }
           echo "install.sh is executable."
+
+      - name: Installer is idempotent (never clobbers learned state)
+        run: |
+          set -euo pipefail
+          # The ledger/playbook are "the product" — a reinstall must never
+          # overwrite them. Regression guard for the `cp -n` coreutils >= 9.2
+          # trap (exit nonzero on skip -> clobbering fallback).
+          tmp="$(mktemp -d)"
+          (cd "$tmp" && "$GITHUB_WORKSPACE/install.sh" claude)
+          echo "LEARNED-STATE-MARKER" >> "$tmp/.claude/routing-ledger.md"
+          (cd "$tmp" && "$GITHUB_WORKSPACE/install.sh" claude)
+          grep -q "LEARNED-STATE-MARKER" "$tmp/.claude/routing-ledger.md" \
+            || { echo "::error::reinstall clobbered .claude/routing-ledger.md"; exit 1; }
+          [ -f "$tmp/.claude/routing-ledger.md.tierdecay" ] \
+            || { echo "::error::expected a .tierdecay sidecar on collision"; exit 1; }
+          tmp2="$(mktemp -d)"
+          (cd "$tmp2" && "$GITHUB_WORKSPACE/install.sh" agents)
+          echo "LEARNED-STATE-MARKER" >> "$tmp2/.tierdecay/ledger.md"
+          (cd "$tmp2" && "$GITHUB_WORKSPACE/install.sh" agents)
+          grep -q "LEARNED-STATE-MARKER" "$tmp2/.tierdecay/ledger.md" \
+            || { echo "::error::reinstall clobbered .tierdecay/ledger.md"; exit 1; }
+          echo "Idempotence OK: learned state preserved, sidecars written."

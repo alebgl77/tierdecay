@@ -23,6 +23,14 @@ and this project adheres to [Semantic Versioning][semver].
 
 ### Fixed
 
+- `install.sh` (claude target): replaced `cp -rn || cp -r` with a
+  file-by-file copy through `copy_safe`. On coreutils >= 9.2, `cp -n` exits
+  nonzero when it skips an existing file, so the old fallback silently
+  clobbered `.claude/` on reinstall — including the routing ledger and
+  playbook. Existing files are now always preserved, with the incoming
+  version written as a `.tierdecay` sidecar; CI gained an idempotence test
+  guarding the behaviour.
+
 ### Security
 
 ## [0.1.0] - 2026-07-12
