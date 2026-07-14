@@ -158,15 +158,15 @@ self-poisoning. TierDecay ships with the antibodies:
 
 ```bash
 git clone https://github.com/alebgl77/tierdecay && cd tierdecay
-./install.sh <claude|agents|gemini|aider>   # or: ./install.sh auto
+./install.sh <claude|agents|gemini|aider|cline|goose|windsurf>   # or: ./install.sh auto
 ```
 
 <details>
 <summary><b>Claude Code</b> (native — full 4-agent pipeline)</summary>
 
 Copies `CLAUDE.md` + `.claude/` (4 subagents bound to fable/opus/sonnet/haiku,
-4 skills, ledger) to your repo root. The playbook is **preloaded** into both
-executors via the `skills:` frontmatter. See
+4 skills, the state-write guard hook, ledger) to your repo root. The playbook
+is **preloaded** into both executors via the `skills:` frontmatter. See
 [`adapters/claude-code/`](adapters/claude-code/).
 </details>
 

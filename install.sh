@@ -52,7 +52,7 @@ case "$TARGET" in
       mkdir -p "$DEST/$(dirname "$rel")"
       copy_safe "$f" "$DEST/$rel"
     done
-    say "installed .claude/ (agents, skills, settings, ledger)"
+    say "installed .claude/ (agents, skills, hooks, settings, ledger)"
     ;;
   agents)
     copy_safe "$SRC/adapters/agents-md/AGENTS.md" "$DEST/AGENTS.md"

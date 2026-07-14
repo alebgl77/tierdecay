@@ -75,7 +75,7 @@ No test harness — verification is manual and takes a minute:
 
   ```bash
   mkdir /tmp/td-scratch && cd /tmp/td-scratch
-  /path/to/tierdecay/install.sh <claude|agents|gemini|aider>
+  /path/to/tierdecay/install.sh <claude|agents|gemini|aider|cline|goose|windsurf>
   ls -R .            # context file present; state files seeded
   ```
 

@@ -46,7 +46,7 @@ here, not just in the prompt:
 - `executor` and `heavy-executor` carry a `PreToolUse` hook
   (`.claude/hooks/tierdecay-guard.sh`) that blocks any of their
   Write/Edit/Bash calls referencing `.claude/` or `.tierdecay/` — prompt
-  injection included. `scout` is read-only by tool grant.
+  injection included. `scout` and `oracle` are read-only by tool grant.
 - `settings.json` `ask`-gates `Edit(.claude/**)` and `Edit(.tierdecay/**)`:
   every surviving state write — including the orchestrator's own DISTILL —
   asks for your approval. One click per task close; an unexpected approval
