@@ -7,11 +7,13 @@ description: Complexity-based routing of tasks across Fable 5 (T3), Opus 4.8 (T2
 
 ## 0. Ledger pre-check — posterior beats prior
 
-Before scoring anything, read `.claude/routing-ledger.md`:
-- Task matches a class in **PRIORS** (≥3 logged rows) → use its empirical
+Before scoring anything, read `.claude/routing-ledger.md`, in this order:
+- Class has a live **repo-playbook** entry (not quarantined, floor not
+  reached) → dispatch one tier below the entry's provenance as a PROBE, entry
+  quoted in the brief (`tier-decay` §3). **A live entry outranks PRIORS** — this
+  is what keeps decay iterating.
+- Else task matches a class in **PRIORS** (≥3 logged rows) → use its empirical
   default tier, skip the rubric.
-- Class has a live **repo-playbook** entry → dispatch one tier below the
-  entry's provenance as a PROBE, entry quoted in the brief (`tier-decay` §3).
 - Otherwise → score below. The rubric is only the cold-start prior.
 
 ## 1. Scoring rubric

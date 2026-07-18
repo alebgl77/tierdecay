@@ -70,12 +70,12 @@ high-tier solve should have somewhere to write its first ledger row.
 
 No test harness — verification is manual and takes a minute:
 
-- `shellcheck install.sh` — the installer is POSIX bash; keep it clean.
+- `shellcheck install.sh` — the installer is Bash; keep it clean.
 - Install into a scratch repo and confirm files land:
 
   ```bash
   mkdir /tmp/td-scratch && cd /tmp/td-scratch
-  /path/to/tierdecay/install.sh <claude|agents|gemini|aider>
+  /path/to/tierdecay/install.sh <claude|agents|gemini|aider|cline|goose|windsurf>
   ls -R .            # context file present; state files seeded
   ```
 

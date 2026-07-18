@@ -22,7 +22,7 @@ there.
 
 ## Scope & threat model
 
-TierDecay is markdown instruction files plus a POSIX `install.sh` that copies
+TierDecay is markdown instruction files plus a Bash `install.sh` that copies
 those files into your repository. There is no network service, no runtime
 daemon, no telemetry, and no secret handling — so the usual server-side and
 credential surfaces do not apply here. Two surfaces are real and in scope:

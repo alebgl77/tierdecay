@@ -39,8 +39,10 @@ entry's provenance tier**, with the entry quoted verbatim in the brief's
 CONTEXT and acceptance criteria mandatory.
 
 - **Pass** → `hits +1` on the entry. At `hits ≥ 2`, the class's default tier
-  is permanently lowered in PRIORS. Decay is iterative: the counter resets and
-  the class probes the next tier down on later occurrences (T3→T2→T1).
+  is permanently lowered in PRIORS **and the entry's `provenance:` is rewritten
+  to the new lower tier**. Decay is iterative: the counter resets and — because
+  a live entry outranks PRIORS (`model-routing` §0) — the class probes the next
+  tier down on later occurrences (T3→T2→T1), until provenance reaches T1.
 - **Fail** → escalate normally, move the entry to QUARANTINE with a one-line
   failure cause. The failed tier becomes the class's **floor** (sticky tier);
   revise or delete the entry on next encounter.

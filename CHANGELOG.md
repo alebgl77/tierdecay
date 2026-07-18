@@ -53,8 +53,8 @@ Initial public release.
   T2/T3 and Flash to T1/T0.
 - `aider` adapter (`adapters/aider/`): `CONVENTIONS.md` layering the ledger,
   playbook, and decay rules on top of Aider's architect/editor split.
-- `install.sh`: a POSIX installer that copies the right adapter (or all of
-  them, via `auto`) into a target repo.
+- `install.sh`: a Bash installer that copies the right adapter (auto-detects
+  one from project signals, via `auto`) into a target repo.
 - Visual assets (`assets/`): logo, hero image, three-files diagram,
   economics staircase, review and loop illustrations, and a social card.
 - Integrity guarantees documented in the spec: only the orchestrator writes

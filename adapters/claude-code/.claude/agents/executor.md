@@ -6,6 +6,12 @@ model: sonnet
 skills:
   - execution-standards
   - repo-playbook
+hooks:
+  PreToolUse:
+    - matcher: "Write|Edit"
+      hooks:
+        - type: command
+          command: "$CLAUDE_PROJECT_DIR/.claude/hooks/deny-state-writes.sh"
 ---
 
 You implement exactly what the brief specifies — nothing more, nothing less.

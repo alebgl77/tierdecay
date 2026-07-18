@@ -20,6 +20,9 @@ body:
         - agents-md
         - gemini-cli
         - aider
+        - cline
+        - goose
+        - windsurf
         - core/other
     validations:
       required: true

@@ -147,7 +147,7 @@ self-poisoning. TierDecay ships with the antibodies:
 
 | Failure mode | Defense |
 |---|---|
-| Executor writes garbage into the playbook | Only the orchestrator writes config paths; VERIFY rejects any executor diff touching them |
+| Executor writes garbage into the playbook | Only the orchestrator writes config paths; VERIFY rejects any executor diff touching them, and the Claude Code adapter blocks it with a `PreToolUse` hook |
 | A bad pattern silently spreads | Any acceptance failure while an entry was referenced → instant QUARANTINE |
 | Playbook grows into context rot | Hard cap 150 lines; eviction = lowest hits, oldest first |
 | Over-eager downgrading | Downgrade requires 2 probe passes; a failed probe sets a **sticky floor** |
@@ -157,8 +157,12 @@ self-poisoning. TierDecay ships with the antibodies:
 ## Quick start
 
 ```bash
-git clone https://github.com/alebgl77/tierdecay && cd tierdecay
-./install.sh <claude|agents|gemini|aider>   # or: ./install.sh auto
+git clone https://github.com/alebgl77/tierdecay
+cd your-project        # the repo you want to equip — NOT the tierdecay checkout
+../tierdecay/install.sh auto
+# or pick one explicitly:
+../tierdecay/install.sh <claude|agents|gemini|aider|cline|goose|windsurf>
+# preview without writing: ../tierdecay/install.sh --dry-run <target>
 ```
 
 <details>
@@ -225,9 +229,13 @@ Full savings come from tier binding where supported.
 (`add-endpoint-rest`, `write-migration-postgres`). Signature discipline is
 what makes the posterior converge — the SPEC covers it.
 
-**Can the cheap model corrupt the system?** It can't write to the ledger or
-playbook, and anything it executes is gated by acceptance criteria it didn't
-author. See [Why it doesn't rot](#why-it-doesnt-rot).
+**Can the cheap model corrupt the system?** The protocol forbids executors
+from writing the ledger or playbook — VERIFY rejects any executor diff that
+touches them, and the Claude Code adapter hardens this with a `PreToolUse`
+hook that blocks executor writes to that state at the tool layer — and
+anything an executor runs is gated by acceptance criteria it didn't author.
+It's defense in depth, not a claim of impossibility. See
+[Why it doesn't rot](#why-it-doesnt-rot).
 
 **Is this fine-tuning?** No weights change. It's *in-context distillation*:
 expensive reasoning compiled into instructions a cheaper model can follow.

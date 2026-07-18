@@ -16,10 +16,14 @@ tier, plans/routes/verifies), **executors** (do the work), **ledger** and
 
 ## 2. Protocol (every non-trivial request)
 
-1. **RECON** — T0 maps the terrain; the orchestrator never explores raw.
-2. **PLAN** — decompose into tasks. Route each task:
-   - class in ledger **PRIORS** (≥3 rows) → empirical default tier, skip scoring;
-   - class has a live **playbook** entry → **PROBE** one tier below provenance;
+1. **RECON** — T0 maps the terrain (recon report ≤400 words); the orchestrator
+   never explores raw.
+2. **PLAN** — decompose into tasks. Route each task, in this order:
+   - class has a live **playbook** entry (not quarantined, floor not reached)
+     → **PROBE** one tier below the entry's provenance, entry quoted in the
+     brief. **A live entry outranks PRIORS** so decay keeps iterating;
+   - else class in ledger **PRIORS** (≥3 rows) → empirical default tier, skip
+     scoring;
    - otherwise → score the rubric (§3).
 3. **DISPATCH** — every task gets a self-contained brief:
    `OBJECTIVE / CONTEXT / FILES / CONSTRAINTS / ACCEPTANCE / REPORT`.
@@ -51,14 +55,18 @@ implements, T3 reviews). Tie-breaks: strong tests → down; critical path → up
 - **Class signature**: 2–4 hyphenated tokens, `verb-object-surface`. Reuse
   existing signatures before minting new ones.
 - **Ledger row** (every task): `date | class | predicted | executed | outcome
-  | escalations | playbook`. At ≥3 rows a class enters PRIORS; the posterior
-  overrides the rubric in both directions (2 escalations raise a default).
+  | esc | playbook` (keep the last 50 rows). At ≥3 rows a class enters PRIORS;
+  the posterior overrides the rubric in both directions (2 escalations raise a
+  default). One **escalation** = 2 failed acceptance runs at a tier ⇒ retry one
+  tier up, both failure reports attached verbatim (§2 step 5).
 - **Distill** only plausibly-recurring classes. Distill decisions —
   invariants, ordering, the trap — never diffs, secrets, or volatile values.
 - **Probe**: next occurrence runs one tier below provenance, entry quoted in
-  the brief. Pass → hits+1; **2 hits → permanent downgrade**, counter resets,
-  decay iterates (T3→T2→T1). Fail → entry quarantined, failed tier becomes a
-  **sticky floor**, escalate normally.
+  the brief. Pass → hits+1; **2 hits → permanent downgrade** — **rewrite the
+  entry's provenance to the new lower tier** — counter resets, decay iterates
+  (T3→T2→T1) until the entry's provenance reaches T1 (the execution floor).
+  Fail → entry quarantined, failed tier becomes a **sticky floor**, escalate
+  normally.
 
 ## 5. Integrity invariants (non-negotiable in every adapter)
 

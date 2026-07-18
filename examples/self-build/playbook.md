@@ -6,7 +6,8 @@
 ## PATTERNS
 
 ### PB-1 · add-adapter-cli
-provenance: T2 2026-07 · hits: 2
+provenance: T1 2026-07 · hits: 0   <!-- downgraded T2→T1 after 2 probe hits; provenance rewritten + counter reset per SPEC §4. T1 is the execution floor — no further probe. -->
+history: solved T2 (cline) · probed T1 ✓✓ (goose, windsurf)
 WHEN: adding a new CLI/agent adapter under `adapters/<key>/`.
 DO:
   1. Recon the CLI's **real** rules file + model controls first (official

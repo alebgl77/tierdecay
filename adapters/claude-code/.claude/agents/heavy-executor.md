@@ -6,6 +6,12 @@ model: opus
 skills:
   - execution-standards
   - repo-playbook
+hooks:
+  PreToolUse:
+    - matcher: "Write|Edit"
+      hooks:
+        - type: command
+          command: "$CLAUDE_PROJECT_DIR/.claude/hooks/deny-state-writes.sh"
 ---
 
 You handle execution where correctness is subtle and mistakes are expensive.

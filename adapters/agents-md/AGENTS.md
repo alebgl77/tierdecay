@@ -40,9 +40,12 @@ protocol anyway — playbook hits still cut turns and context.
 4. **VERIFY** — run the acceptance tests. Critical surfaces (security, auth,
    money, migrations, public contracts) get an explicit T3-style review pass:
    hunt inverted logic, boundaries, races, injection, authz gaps, silent data
-   loss. Verdict: APPROVE / BLOCK + minimal fix.
+   loss. Verdict: APPROVE / APPROVE-WITH-NITS / BLOCK + minimal fix.
 5. **DISTILL** — close EVERY task with one ledger row:
    `| date | class | predicted | executed | outcome | esc | playbook |`.
+   **Class signature**: 2–4 hyphenated tokens `verb-object-surface`; scan the
+   LOG and reuse an existing signature before minting a new one — the posterior
+   only converges if signatures are stable. Full protocol: `.tierdecay/PROTOCOL.md`.
    After a T2/T3-grade success on a recurring class, add a ≤15-line playbook
    entry (WHEN / DO / VERIFY + provenance + hits). Update PRIORS at ≥3 rows.
 
@@ -52,14 +55,18 @@ protocol anyway — playbook hits still cut turns and context.
   permanently**; the counter resets and decay iterates (T3→T2→T1).
 - Probe fail → move the entry to QUARANTINE with a one-line cause; the failed
   tier is that class's sticky floor; escalate normally.
-- 2 escalations from a class's default → raise the default. The rubric is
-  only the cold-start prior; the ledger is the posterior.
+- One **escalation** = 2 failed acceptance runs at a tier ⇒ retry one tier up
+  with both failure reports attached. 2 escalations from a class's default →
+  raise the default. The rubric is only the cold-start prior; the ledger is the
+  posterior.
 
 ## Integrity (non-negotiable)
 
 - `.tierdecay/` is written ONLY during DISTILL, never as part of a task diff.
-- Never apply a QUARANTINE entry. An entry contradicting the current codebase
-  is reported `stale`, not improvised around.
+- Any acceptance failure while a playbook entry was referenced → move it to
+  QUARANTINE immediately (probe or not). Never apply a QUARANTINE entry. An
+  entry contradicting the current codebase is reported `stale`, not improvised
+  around.
 - Playbook cap 150 lines: evict lowest hits, oldest first.
 - Distill decisions (invariants, ordering, the trap) — never diffs, secrets,
   or volatile business values. When in doubt, don't distill.
