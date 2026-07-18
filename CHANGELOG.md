@@ -30,8 +30,9 @@ and this project adheres to [Semantic Versioning][semver].
   internal link resolution); a `release.yml` workflow guarding
   tag↔CHANGELOG↔CITATION coherence; `dependabot.yml` for actions updates.
 - Claude Code adapter: a `PreToolUse` guard hook
-  (`.claude/hooks/deny-state-writes.sh`) wired into both executors' frontmatter
-  blocks executor writes to the ledger/playbook/`.claude/**` at the tool layer.
+  (`.claude/hooks/tierdecay-guard.sh`) wired into both executors' frontmatter
+  blocks executor calls referencing `.claude/` or `.tierdecay/` at the tool
+  layer (Write/Edit/MultiEdit/NotebookEdit/Bash).
 
 ### Changed
 
@@ -57,13 +58,32 @@ and this project adheres to [Semantic Versioning][semver].
 
 ### Removed
 
+### Security
+
+- Claude Code adapter: SPEC §5 invariant 1 ("only the orchestrator writes
+  state") is now enforced at the tool layer, not just in the prompt —
+  `executor` and `heavy-executor` carry a `PreToolUse` guard hook
+  (`.claude/hooks/tierdecay-guard.sh`) that blocks their calls referencing
+  `.claude/` or `.tierdecay/`, and `settings.json` `ask`-gates all remaining
+  state writes behind human approval. CI verifies the guard's behaviour.
+- README/SECURITY.md: the anti-poisoning FAQ no longer claims impossibility
+  ("it can't write") — defenses are documented as explicit layers (protocol,
+  tool-layer enforcement, human review) with the residual risk stated.
+- SECURITY.md: new "Distribution and shared-repo surface" section — install
+  from tagged releases verified against the `SHA256SUMS` asset (shipped from
+  v0.1.0), and an explicit commit-vs-ignore policy choice for shared
+  `.tierdecay/` state (a committed playbook is a shared attack surface;
+  review its diffs like code).
+
 ### Fixed
 
 - **install.sh could destroy learned state**: the `claude` target's
   `cp -rn … || cp -r …` fallback silently overwrote an existing `.claude/`
   (routing ledger and playbook included) on GNU coreutils ≥ 9.2, where `cp -n`
-  exits non-zero when skipping. Replaced with a guarded per-file walk;
-  regression-tested in CI.
+  exits non-zero when skipping. Replaced with a guarded per-file walk through
+  `copy_safe` — existing files are always preserved and a differing incoming
+  version lands as a `.tierdecay` sidecar; regression-tested in CI (idempotence
+  test + full install matrix).
 - Quick-start commands no longer `cd` into the checkout (which guaranteed the
   installer's self-install guard would abort) and now list all 8 targets.
 - CI "Every adapter is complete" check was vacuous (the `*.md` glob matched
@@ -74,12 +94,6 @@ and this project adheres to [Semantic Versioning][semver].
 - `examples/self-build/playbook.md` made SPEC-conformant (provenance rewritten
   to T1, hit counter reset after downgrade).
 - Docs no longer call the Bash installer "POSIX".
-
-### Security
-
-- README FAQ no longer overstates executor isolation ("it can't write to the
-  ledger or playbook"): rephrased as protocol-level defense in depth, now
-  backed by the mechanical `PreToolUse` guard in the Claude Code adapter.
 
 ## [0.1.0] - 2026-07-12
 

@@ -147,7 +147,7 @@ self-poisoning. TierDecay ships with the antibodies:
 
 | Failure mode | Defense |
 |---|---|
-| Executor writes garbage into the playbook | Only the orchestrator writes config paths; VERIFY rejects any executor diff touching them, and the Claude Code adapter blocks it with a `PreToolUse` hook |
+| Executor writes garbage into the playbook | Only the orchestrator writes config paths; VERIFY rejects any executor diff touching them — and the Claude Code adapter blocks it in-tool (guard hook + ask-gated writes) |
 | A bad pattern silently spreads | Any acceptance failure while an entry was referenced → instant QUARANTINE |
 | Playbook grows into context rot | Hard cap 150 lines; eviction = lowest hits, oldest first |
 | Over-eager downgrading | Downgrade requires 2 probe passes; a failed probe sets a **sticky floor** |
@@ -169,8 +169,8 @@ cd your-project        # the repo you want to equip — NOT the tierdecay checko
 <summary><b>Claude Code</b> (native — full 4-agent pipeline)</summary>
 
 Copies `CLAUDE.md` + `.claude/` (4 subagents bound to fable/opus/sonnet/haiku,
-4 skills, ledger) to your repo root. The playbook is **preloaded** into both
-executors via the `skills:` frontmatter. See
+4 skills, the state-write guard hook, ledger) to your repo root. The playbook
+is **preloaded** into both executors via the `skills:` frontmatter. See
 [`adapters/claude-code/`](adapters/claude-code/).
 </details>
 
@@ -232,13 +232,14 @@ Full savings come from tier binding where supported.
 (`add-endpoint-rest`, `write-migration-postgres`). Signature discipline is
 what makes the posterior converge — the SPEC covers it.
 
-**Can the cheap model corrupt the system?** The protocol forbids executors
-from writing the ledger or playbook — VERIFY rejects any executor diff that
-touches them, and the Claude Code adapter hardens this with a `PreToolUse`
-hook that blocks executor writes to that state at the tool layer — and
-anything an executor runs is gated by acceptance criteria it didn't author.
-It's defense in depth, not a claim of impossibility. See
-[Why it doesn't rot](#why-it-doesnt-rot).
+**Can the cheap model corrupt the system?** Defense in depth, not an
+impossibility claim. The protocol makes state orchestrator-only and VERIFY
+rejects executor diffs touching it; the Claude Code adapter also enforces it
+at the tool layer — executors carry a `PreToolUse` guard hook that blocks any
+call referencing the state paths, and the shipped `settings.json` `ask`-gates
+every remaining state write behind your approval. Everything an executor runs
+is still judged against acceptance criteria it didn't author. Residual risk
+and threat model: [SECURITY.md](SECURITY.md).
 
 **Is this fine-tuning?** No weights change. It's *in-context distillation*:
 expensive reasoning compiled into instructions a cheaper model can follow.

@@ -151,9 +151,15 @@ uninstall() {
 case "$TARGET" in
   claude)
     copy_safe "$SRC/adapters/claude-code/CLAUDE.md" "$DEST/CLAUDE.md"
+    # File-by-file through copy_safe (copy_tree): existing files (ledger,
+    # playbook, settings) are NEVER clobbered — a differing incoming version
+    # lands as a .tierdecay sidecar to merge. Do not "simplify" this back to
+    # `cp -rn || cp -r`: on coreutils >= 9.2, `cp -n` exits nonzero when it
+    # skips an existing file, which used to trigger the clobbering fallback
+    # and silently destroy the learned state.
     [ "$DRY_RUN" = 1 ] || mkdir -p "$DEST/.claude"
     copy_tree "$SRC/adapters/claude-code/.claude" "$DEST/.claude"
-    say "processed .claude/ (agents, skills, settings, ledger — existing files preserved)"
+    say "installed .claude/ (agents, skills, hooks, settings, ledger — existing files preserved)"
     ;;
   agents)
     copy_safe "$SRC/adapters/agents-md/AGENTS.md" "$DEST/AGENTS.md"

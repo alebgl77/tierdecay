@@ -8,10 +8,10 @@ skills:
   - repo-playbook
 hooks:
   PreToolUse:
-    - matcher: "Write|Edit"
+    - matcher: "Write|Edit|MultiEdit|NotebookEdit|Bash"
       hooks:
         - type: command
-          command: "$CLAUDE_PROJECT_DIR/.claude/hooks/deny-state-writes.sh"
+          command: ".claude/hooks/tierdecay-guard.sh"
 ---
 
 You handle execution where correctness is subtle and mistakes are expensive.

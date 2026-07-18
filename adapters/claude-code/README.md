@@ -23,13 +23,8 @@ break-even at the first reuse.
 
 Anti-poisoning defenses (the failure mode of any self-modifying system):
 - Only the main thread writes under `.claude/**`; VERIFY rejects executor
-  diffs touching it. This is also enforced mechanically: `executor` and
-  `heavy-executor` ship a `PreToolUse` hook
-  (`.claude/hooks/deny-state-writes.sh`) that blocks any executor `Write`/`Edit`
-  to the ledger, the playbook, or `.claude/**` at the tool layer — the
-  invariant no longer relies on the model remembering it. (Requires a Claude
-  Code version that honors per-agent `hooks:` frontmatter; without it the
-  protocol-level VERIFY rejection still applies.)
+  diffs touching it — and the invariant is also enforced mechanically at the
+  tool layer (see the enforcement section below).
 - Any acceptance failure while an entry was referenced → instant QUARANTINE.
 - Playbook hard cap 150 lines with hits-based eviction (no context rot).
 - A failed probe sets a sticky floor — the system can't downgrade past
@@ -44,6 +39,24 @@ Anti-poisoning defenses (the failure mode of any self-modifying system):
 4. Enable extended thinking in the session (Tab); in current Claude Code
    versions subagents inherit the main conversation's thinking configuration.
 
+## State-write enforcement
+
+SPEC §5's "only the orchestrator writes state" is enforced in the tool layer
+here, not just in the prompt:
+
+- `executor` and `heavy-executor` carry a `PreToolUse` hook
+  (`.claude/hooks/tierdecay-guard.sh`) that blocks any of their
+  Write/Edit/Bash calls referencing `.claude/` or `.tierdecay/` — prompt
+  injection included. `scout` and `oracle` are read-only by tool grant.
+- `settings.json` `ask`-gates `Edit(.claude/**)` and `Edit(.tierdecay/**)`:
+  every surviving state write — including the orchestrator's own DISTILL —
+  asks for your approval. One click per task close; an unexpected approval
+  prompt is your injection alarm. Prefer protocol-only enforcement? Remove
+  the `ask` rules — but then the invariants rest on the prompt alone.
+
+Note: per-agent `hooks` frontmatter applies to project agents like these;
+Claude Code ignores it for agents loaded from plugins.
+
 ## Verify
 - `/agents` should list: scout, executor, heavy-executor, oracle.
 - **Skills preload wired?** Dispatch to `executor`: "quote the first line of the
@@ -52,8 +65,9 @@ Anti-poisoning defenses (the failure mode of any self-modifying system):
   distillation half of the loop is dark; pin the entry into the brief until it is.
 - **Integrity hook active?** Dispatch to `executor`: "append `# test` to
   `.claude/routing-ledger.md`." It must be blocked by the `PreToolUse` guard
-  (`.claude/hooks/deny-state-writes.sh`). If the write goes through, your build
-  doesn't honor per-agent `hooks:` — fall back to VERIFY-level enforcement.
+  (`.claude/hooks/tierdecay-guard.sh`). If the write goes through, your build
+  doesn't honor per-agent `hooks:` — fall back to VERIFY-level enforcement
+  (the `settings.json` `ask` rules still gate state writes).
 - Ask for a multi-step feature. Expected behavior: scout recon → plan with
   [T1]/[T2]/[T3] tags → dispatch → verification → oracle review on critical
   diffs.
