@@ -7,10 +7,12 @@ Copies `AGENTS.md` to your repo root — Cursor reads it natively at the root an
 in nested subdirectories ([docs](https://cursor.com/docs/rules)) — and seeds
 `.tierdecay/`.
 
-Prefer an always-on, version-controlled rule? Move the file to a **Project Rule**
-instead: `.cursor/rules/tierdecay.mdc` with front-matter `alwaysApply: true`
-(the "Always Apply" rule type). The legacy `.cursorrules` root file still loads
-but is being deprecated — don't build on it.
+Want an always-on, version-controlled rule as well? Copy the shipped
+[`tierdecay.mdc`](tierdecay.mdc) to `.cursor/rules/tierdecay.mdc` — an
+`alwaysApply: true` Project Rule ("Always Apply" type) that pins the protocol
+into every request. It's a thin pointer to `AGENTS.md` (single source of
+truth), not a copy — no drift surface. The legacy `.cursorrules` root file
+still loads but is being deprecated — don't build on it.
 
 ## Model binding (no native planner/executor pair — a per-message picker)
 

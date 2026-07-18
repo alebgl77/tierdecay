@@ -19,8 +19,39 @@ and this project adheres to [Semantic Versioning][semver].
   with `alwaysApply: true`), mapping tiers onto Cursor's per-conversation /
   per-surface model picker (Agent/Ask/Plan modes). Adds an `install.sh` case,
   `.cursor/` auto-detection, and CI matrix + conformance coverage.
+- `install.sh` flags: `--help`, `--version`, `--dry-run` (preview every write),
+  `--uninstall` (removes context files, never touches learned state).
+- Non-native installs now ship the full spec as `.tierdecay/PROTOCOL.md`, so
+  class-signature discipline and the §5 invariants travel with every adapter.
+- CI: an `install-matrix` job (ubuntu + macos × 8 targets) asserting install
+  **and** idempotent re-install (learned state must survive); a `conformance`
+  job (120-line caps, adapter↔installer parity, normative-token presence in
+  every non-native adapter); an offline `docs` job (mermaid fence balance,
+  internal link resolution); a `release.yml` workflow guarding
+  tag↔CHANGELOG↔CITATION coherence; `dependabot.yml` for actions updates.
+- Claude Code adapter: a `PreToolUse` guard hook
+  (`.claude/hooks/deny-state-writes.sh`) wired into both executors' frontmatter
+  blocks executor writes to the ledger/playbook/`.claude/**` at the tool layer.
 
 ### Changed
+
+- `install.sh` rewritten around non-destructive `copy_safe`/`copy_tree`
+  helpers: one collision policy everywhere (sidecar `*.tierdecay`, pending
+  sidecars preserved), no reliance on `cp -n` semantics.
+- `detect()` now reads project signals (`.claude/`, `.cursor/`, `.clinerules/`,
+  `.windsurf/`, `.goosehints`, `GEMINI.md`, `CONVENTIONS.md`, `AGENTS.md`)
+  before machine-global binaries, and can resolve cursor/cline/goose/windsurf.
+- SPEC: PROBE now explicitly outranks PRIORS while a live entry exists, and a
+  downgrade rewrites the entry's provenance — the T3→T2→T1 iteration has an
+  operational path; escalation trigger (2 failed acceptance runs = 1
+  escalation) defined; `≤400 words` recon cap and `keep last 50` ledger
+  retention lifted into the spec.
+- All 6 non-native adapters now carry invariant §5.2 (quarantine on ANY
+  acceptance failure), the escalation trigger, class-signature discipline, the
+  `any axis maxed → T3` clause, and the full APPROVE / APPROVE-WITH-NITS /
+  BLOCK verdict vocabulary.
+- Cline adapter: T0 recon explicitly assigned to Plan mode (read-only safety
+  over model cost), resolving the tier-map contradiction.
 
 ### Deprecated
 
@@ -28,7 +59,27 @@ and this project adheres to [Semantic Versioning][semver].
 
 ### Fixed
 
+- **install.sh could destroy learned state**: the `claude` target's
+  `cp -rn … || cp -r …` fallback silently overwrote an existing `.claude/`
+  (routing ledger and playbook included) on GNU coreutils ≥ 9.2, where `cp -n`
+  exits non-zero when skipping. Replaced with a guarded per-file walk;
+  regression-tested in CI.
+- Quick-start commands no longer `cd` into the checkout (which guaranteed the
+  installer's self-install guard would abort) and now list all 8 targets.
+- CI "Every adapter is complete" check was vacuous (the `*.md` glob matched
+  `README.md` itself); it now excludes the README and actually fails on a
+  missing context file.
+- `adapter_request.yml`: unquoted `- Yes` parsed as a YAML boolean, breaking
+  the dropdown; quoted. Bug-report dropdown now lists all adapters.
+- `examples/self-build/playbook.md` made SPEC-conformant (provenance rewritten
+  to T1, hit counter reset after downgrade).
+- Docs no longer call the Bash installer "POSIX".
+
 ### Security
+
+- README FAQ no longer overstates executor isolation ("it can't write to the
+  ledger or playbook"): rephrased as protocol-level defense in depth, now
+  backed by the mechanical `PreToolUse` guard in the Claude Code adapter.
 
 ## [0.1.0] - 2026-07-12
 
