@@ -78,7 +78,8 @@ jobs:
         run: |
           set -euo pipefail
           declare -A map=( [agents-md]=agents [gemini-cli]=gemini [claude-code]=claude \
-                           [aider]=aider [cline]=cline [goose]=goose [windsurf]=windsurf )
+                           [aider]=aider [cline]=cline [goose]=goose [windsurf]=windsurf \
+                           [cursor]=cursor )
           for d in adapters/*/; do
             name="$(basename "$d")"
             t="${map[$name]:-$name}"
@@ -92,7 +93,8 @@ jobs:
           set -euo pipefail
           nonnative=(adapters/agents-md/AGENTS.md adapters/aider/CONVENTIONS.md \
                      adapters/gemini-cli/GEMINI.md adapters/cline/AGENTS.md \
-                     adapters/goose/AGENTS.md adapters/windsurf/AGENTS.md)
+                     adapters/goose/AGENTS.md adapters/windsurf/AGENTS.md \
+                     adapters/cursor/AGENTS.md)
           need=("150" "QUARANTINE" "verb-object-surface" "PROTOCOL.md" "any axis maxed")
           for f in "${nonnative[@]}"; do
             for tok in "${need[@]}"; do
@@ -138,7 +140,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        target: [claude, agents, gemini, aider, cline, goose, windsurf]
+        target: [claude, agents, cursor, gemini, aider, cline, goose, windsurf]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4 # pin to a SHA once Dependabot proposes it

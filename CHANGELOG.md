@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning][semver].
   model, Windsurf per-message model picker) — plus their `install.sh` cases.
   Built by dogfooding TierDecay on itself; the real routing ledger from that
   session is in `examples/self-build/`.
+- `cursor` adapter — ships an `AGENTS.md` Cursor reads natively at the repo root
+  and in nested subdirectories (or a Project Rule at `.cursor/rules/tierdecay.mdc`
+  with `alwaysApply: true`), mapping tiers onto Cursor's per-conversation /
+  per-surface model picker (Agent/Ask/Plan modes). Adds an `install.sh` case,
+  `.cursor/` auto-detection, and CI matrix + conformance coverage.
 
 ### Changed
 

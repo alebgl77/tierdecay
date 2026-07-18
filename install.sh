@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # TierDecay installer — run from the repo you want to equip:
-#   /path/to/tierdecay/install.sh [--dry-run] [--uninstall] <claude|agents|gemini|aider|cline|goose|windsurf|auto>
+#   /path/to/tierdecay/install.sh [--dry-run] [--uninstall] <claude|agents|cursor|gemini|aider|cline|goose|windsurf|auto>
 #   /path/to/tierdecay/install.sh --help
 # Bash (not strict POSIX): uses BASH_SOURCE and arrays.
 set -euo pipefail
@@ -23,10 +23,10 @@ TierDecay installer ${VERSION}
 
 Usage: /path/to/tierdecay/install.sh [options] [target]
 
-Targets:  claude | agents | gemini | aider | cline | goose | windsurf | auto
-          (auto detects from project signals first, then installed CLIs;
-           auto only resolves claude/agents/gemini/aider — pick cline/goose/
-           windsurf explicitly)
+Targets:  claude | agents | cursor | gemini | aider | cline | goose | windsurf | auto
+          (auto reads project signals first — .claude, .cursor, .clinerules,
+           .windsurf, .goosehints, GEMINI.md, CONVENTIONS.md, AGENTS.md — then
+           installed CLIs; pass a target explicitly to override)
 
 Options:
   --dry-run     print every write that WOULD happen; change nothing
@@ -106,12 +106,13 @@ seed_state() {
 detect() {
   # Project signals win over machine-global binaries.
   [ -d "$DEST/.claude" ]        && { echo claude;   return; }
+  [ -d "$DEST/.cursor" ]        && { echo cursor;   return; }
   [ -d "$DEST/.clinerules" ]    && { echo cline;    return; }
   { [ -d "$DEST/.windsurf" ] || [ -d "$DEST/.devin" ]; } && { echo windsurf; return; }
   [ -f "$DEST/.goosehints" ]    && { echo goose;    return; }
   [ -f "$DEST/GEMINI.md" ]      && { echo gemini;   return; }
   [ -f "$DEST/CONVENTIONS.md" ] && { echo aider;    return; }
-  { [ -d "$DEST/.cursor" ] || [ -f "$DEST/AGENTS.md" ]; } && { echo agents; return; }
+  [ -f "$DEST/AGENTS.md" ]      && { echo agents;   return; }
   # Fall back to machine-global CLI availability.
   command -v claude >/dev/null 2>&1 && { echo claude; return; }
   command -v gemini >/dev/null 2>&1 && { echo gemini; return; }
@@ -167,11 +168,11 @@ case "$TARGET" in
     seed_state
     printf '\nrun:\n  aider --architect --model <frontier> --editor-model <cheap> --read CONVENTIONS.md\n'
     ;;
-  cline|goose|windsurf)
+  cline|goose|windsurf|cursor)
     copy_safe "$SRC/adapters/$TARGET/AGENTS.md" "$DEST/AGENTS.md"
     seed_state
     ;;
-  *) die "unknown target '$TARGET' (claude|agents|gemini|aider|cline|goose|windsurf|auto)";;
+  *) die "unknown target '$TARGET' (claude|agents|cursor|gemini|aider|cline|goose|windsurf|auto)";;
 esac
 
 if [ "$DRY_RUN" = 1 ]; then

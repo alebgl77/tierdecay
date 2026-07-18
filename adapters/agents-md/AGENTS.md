@@ -1,8 +1,9 @@
 # TierDecay Protocol — universal AGENTS.md adapter
 
-<!-- Works with every CLI that reads AGENTS.md: Codex CLI, Cursor, OpenCode,
-     GitHub Copilot, Zed, and friends. State files: .tierdecay/ledger.md and
-     .tierdecay/playbook.md (created by install.sh). -->
+<!-- Works with every CLI that reads AGENTS.md: Codex CLI, OpenCode,
+     GitHub Copilot, Zed, and friends. (Cursor reads AGENTS.md too but now has
+     a dedicated adapter — see adapters/cursor/.) State files:
+     .tierdecay/ledger.md and .tierdecay/playbook.md (created by install.sh). -->
 
 You operate under the TierDecay protocol: solve each problem class at a high
 tier at most once; afterwards it is a documented pattern executed cheaper.
