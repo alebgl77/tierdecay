@@ -1,7 +1,7 @@
 # Cursor adapter
 
 ```bash
-../../install.sh cursor
+/path/to/tierdecay/install.sh cursor   # run from the repo you want to equip
 ```
 Copies `AGENTS.md` to your repo root — Cursor reads it natively at the root and
 in nested subdirectories ([docs](https://cursor.com/docs/rules)) — and seeds

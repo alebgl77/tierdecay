@@ -77,6 +77,19 @@ and this project adheres to [Semantic Versioning][semver].
 
 ### Fixed
 
+- **Guard hook false positives**: the `PreToolUse` guard judged the entire
+  tool payload, so any legitimate write whose *content* merely mentioned
+  `.claude/` or `.tierdecay/` was blocked — including adding `.tierdecay/` to
+  `.gitignore`, the exact choice SECURITY.md recommends. File tools are now
+  judged by their target path only; Bash is still judged by its command
+  string. CI carries the false-positive regressions.
+- `release.yml` now builds the release archive and its `SHA256SUMS`
+  (`sha256sum -c` compatible, same format as the v0.1.0 assets) so future
+  releases keep the verification contract documented in SECURITY.md, and
+  guards that `install.sh`'s `VERSION` constant matches the tag.
+- Adapter READMEs showed a copy-pasteable install command
+  (`../../install.sh <target>`) that fails from the repo being equipped;
+  aligned on `/path/to/tierdecay/install.sh <target>`.
 - **install.sh could destroy learned state**: the `claude` target's
   `cp -rn … || cp -r …` fallback silently overwrote an existing `.claude/`
   (routing ledger and playbook included) on GNU coreutils ≥ 9.2, where `cp -n`

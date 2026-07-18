@@ -4,7 +4,7 @@ One file, every CLI that adopted the AGENTS.md standard.
 
 ## Install
 ```bash
-../../install.sh agents        # from the repo you want to equip
+/path/to/tierdecay/install.sh agents   # run from the repo you want to equip
 ```
 Copies `AGENTS.md` to your repo root and seeds `.tierdecay/ledger.md` +
 `.tierdecay/playbook.md` from the core templates. If you already have an

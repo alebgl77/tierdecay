@@ -23,7 +23,9 @@ jobs:
             || { echo "::error::CHANGELOG.md has no section for ${tag}"; exit 1; }
           grep -qE "^version: *${tag}\$" CITATION.cff \
             || { echo "::error::CITATION.cff version != ${tag}"; exit 1; }
-          echo "Tag ${tag} matches CHANGELOG and CITATION.cff."
+          grep -qE "^VERSION=\"${tag}\"\$" install.sh \
+            || { echo "::error::install.sh VERSION != ${tag} (update the constant)"; exit 1; }
+          echo "Tag ${tag} matches CHANGELOG, CITATION.cff, and install.sh."
 
       - name: Extract release notes from CHANGELOG
         id: notes
@@ -37,11 +39,26 @@ jobs:
           ' CHANGELOG.md > RELEASE_NOTES.md
           echo "wrote $(wc -l < RELEASE_NOTES.md) lines of notes"
 
+      - name: Build verifiable archive + SHA256SUMS
+        run: |
+          set -euo pipefail
+          # SECURITY.md's distribution guidance is a contract: "releases from
+          # this repo carry a SHA256SUMS asset — verify the archive against it
+          # (`sha256sum -c SHA256SUMS`)". Same format as the v0.1.0 assets.
+          ver="${GITHUB_REF_NAME#v}"
+          git archive --format=tar.gz --prefix="tierdecay-${ver}/" \
+            -o "tierdecay-${ver}.tar.gz" "${GITHUB_REF_NAME}"
+          sha256sum --binary "tierdecay-${ver}.tar.gz" > SHA256SUMS
+          sha256sum --check SHA256SUMS
+          cat SHA256SUMS
+
       - name: Create the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          ver="${GITHUB_REF_NAME#v}"
           gh release create "${GITHUB_REF_NAME}" \
             --title "${GITHUB_REF_NAME}" \
-            --notes-file RELEASE_NOTES.md
+            --notes-file RELEASE_NOTES.md \
+            "tierdecay-${ver}.tar.gz" SHA256SUMS

@@ -1,7 +1,7 @@
 # Gemini CLI adapter
 
 ```bash
-../../install.sh gemini
+/path/to/tierdecay/install.sh gemini   # run from the repo you want to equip
 ```
 Copies `GEMINI.md` to your repo root (Gemini CLI's default context file) and
 seeds `.tierdecay/`. Tip: add a custom command in `.gemini/commands/` that

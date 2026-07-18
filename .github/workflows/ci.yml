@@ -101,9 +101,19 @@ jobs:
           if echo '{"tool_name":"Write","tool_input":{"file_path":".tierdecay/playbook.md"}}' | "$g" 2>/dev/null; then
             echo "::error::guard failed to block a state write"; exit 1
           fi
+          if echo '{"tool_name":"Bash","tool_input":{"command":"echo x >> .claude/routing-ledger.md"}}' | "$g" 2>/dev/null; then
+            echo "::error::guard failed to block a Bash state write"; exit 1
+          fi
           echo '{"tool_name":"Write","tool_input":{"file_path":"src/app.py"}}' | "$g" \
             || { echo "::error::guard blocked a legitimate write"; exit 1; }
-          echo "Enforcement intact: guard blocks state writes, passes normal ones."
+          # False-positive regressions: content may MENTION state paths as long
+          # as the target path is not state (e.g. SECURITY.md's own advice to
+          # add .tierdecay/ to .gitignore must be executable by an executor).
+          echo '{"tool_name":"Edit","tool_input":{"file_path":".gitignore","old_string":"node_modules/","new_string":"node_modules/\n.tierdecay/"}}' | "$g" \
+            || { echo "::error::guard blocked a legitimate .gitignore edit (content-only mention)"; exit 1; }
+          echo '{"tool_name":"Write","tool_input":{"file_path":"README.md","content":"state lives in .tierdecay/ledger.md"}}' | "$g" \
+            || { echo "::error::guard blocked a legitimate docs write (content-only mention)"; exit 1; }
+          echo "Enforcement intact: guard blocks state writes (file + Bash), passes normal and content-only-mention writes."
 
   conformance:
     name: Protocol conformance

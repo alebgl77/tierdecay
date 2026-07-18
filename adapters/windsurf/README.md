@@ -1,7 +1,7 @@
 # Windsurf (Devin Desktop) adapter
 
 ```bash
-../../install.sh windsurf
+/path/to/tierdecay/install.sh windsurf   # run from the repo you want to equip
 ```
 Copies `AGENTS.md` to your repo root (Windsurf/Devin Desktop reads it, same
 as Codex/Cursor) and seeds `.tierdecay/`. For enforcement rather than a
