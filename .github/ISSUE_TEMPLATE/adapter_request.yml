@@ -44,8 +44,8 @@ body:
     attributes:
       label: Are you willing to open the PR?
       options:
-        - Yes
-        - Maybe, with guidance
+        - "Yes"
+        - "Maybe, with guidance"
         - "No, requesting"
     validations:
       required: true

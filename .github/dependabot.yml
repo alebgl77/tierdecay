@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # Keep GitHub Actions current and let Dependabot propose the exact SHA pins
+  # (safer than hand-pinning a digest we can't verify at authoring time).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci

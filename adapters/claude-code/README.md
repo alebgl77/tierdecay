@@ -23,7 +23,8 @@ break-even at the first reuse.
 
 Anti-poisoning defenses (the failure mode of any self-modifying system):
 - Only the main thread writes under `.claude/**`; VERIFY rejects executor
-  diffs touching it.
+  diffs touching it — and the invariant is also enforced mechanically at the
+  tool layer (see the enforcement section below).
 - Any acceptance failure while an entry was referenced → instant QUARANTINE.
 - Playbook hard cap 150 lines with hits-based eviction (no context rot).
 - A failed probe sets a sticky floor — the system can't downgrade past
@@ -58,6 +59,15 @@ Claude Code ignores it for agents loaded from plugins.
 
 ## Verify
 - `/agents` should list: scout, executor, heavy-executor, oracle.
+- **Skills preload wired?** Dispatch to `executor`: "quote the first line of the
+  PATTERNS section of your playbook." A blank/"no such section" answer means the
+  `skills:` frontmatter isn't taking effect on your Claude Code version — the
+  distillation half of the loop is dark; pin the entry into the brief until it is.
+- **Integrity hook active?** Dispatch to `executor`: "append `# test` to
+  `.claude/routing-ledger.md`." It must be blocked by the `PreToolUse` guard
+  (`.claude/hooks/tierdecay-guard.sh`). If the write goes through, your build
+  doesn't honor per-agent `hooks:` — fall back to VERIFY-level enforcement
+  (the `settings.json` `ask` rules still gate state writes).
 - Ask for a multi-step feature. Expected behavior: scout recon → plan with
   [T1]/[T2]/[T3] tags → dispatch → verification → oracle review on critical
   diffs.

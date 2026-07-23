@@ -1,7 +1,7 @@
 # Goose adapter
 
 ```bash
-../../install.sh goose
+/path/to/tierdecay/install.sh goose   # run from the repo you want to equip
 ```
 Copies `AGENTS.md` to your repo root — Goose reads it by default alongside
 `.goosehints` — and seeds `.tierdecay/`.

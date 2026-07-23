@@ -1,10 +1,10 @@
-# AGENTS.md adapter — Codex CLI · Cursor · OpenCode · Copilot · Zed
+# AGENTS.md adapter — Codex CLI · OpenCode · Copilot · Zed
 
 One file, every CLI that adopted the AGENTS.md standard.
 
 ## Install
 ```bash
-../../install.sh agents        # from the repo you want to equip
+/path/to/tierdecay/install.sh agents   # run from the repo you want to equip
 ```
 Copies `AGENTS.md` to your repo root and seeds `.tierdecay/ledger.md` +
 `.tierdecay/playbook.md` from the core templates. If you already have an
@@ -14,7 +14,6 @@ AGENTS.md, append this one below it.
 | CLI | Mechanism |
 |---|---|
 | Codex CLI | `/model` in-session, or profiles in `~/.codex/config.toml` (`codex --profile heavy`) |
-| Cursor | model picker per conversation; rules stay active across models |
 | OpenCode | per-agent `model` in `opencode.json` — closest to Claude Code's native binding |
 | Copilot CLI | session model selection |
 | Zed | per-thread model picker |

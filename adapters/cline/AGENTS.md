@@ -16,8 +16,11 @@ Enable Settings → **"Use different models for Plan and Act"** and bind:
 
 - **T3** frontier reasoning (planning, architecture, critical review) →
   **Plan-mode model** (your strongest, e.g. Opus-class).
-- **T1 / T0** mechanical, high-volume, low-risk edits and recon →
-  **Act-mode model** (fast/cheap, e.g. Sonnet-class).
+- **T1** mechanical, high-volume, low-risk edits → **Act-mode model**
+  (fast/cheap, e.g. Sonnet-class).
+- **T0** read-only recon runs in **Plan mode** — Cline's only read-only mode,
+  so it borrows the T3 model: read-only safety beats model cost here. Keep
+  recon ≤400 words to bound the expense; Cline has no cheap read-only slot.
 - **T2** mid-tier judgment has **no native slot** — either run it in Plan mode
   (borrowing the T3 model, higher cost) or manually swap the Act model to a
   mid-tier one before executing. Cline has no notion of four tiers; four-way
@@ -45,21 +48,26 @@ the protocol still pays via playbook hits (fewer turns, tighter context).
 4. **VERIFY** — Act mode. Run the acceptance checks. Critical surfaces
    (security, auth, money, migrations, public contracts) get a T3-style review
    hunt — inverted logic, boundaries, races, injection, authz gaps, silent data
-   loss. Verdict: APPROVE / BLOCK + minimal fix.
+   loss. Verdict: APPROVE / APPROVE-WITH-NITS / BLOCK + minimal fix.
 5. **DISTILL** — close EVERY task with one ledger row:
    `| date | class | predicted | executed | outcome | esc | playbook |`.
+   **Class signature**: 2–4 hyphenated tokens `verb-object-surface`; reuse an
+   existing one before minting a new one. Full protocol: `.tierdecay/PROTOCOL.md`.
    After a T2/T3-grade success on a recurring class, add a ≤15-line playbook
    entry (WHEN / DO / VERIFY + provenance + hits). Update PRIORS at ≥3 rows.
 
 ## Decay + integrity (identical to core SPEC)
 
-- 2 probe hits → the class's default tier drops permanently; counter resets,
-  decay iterates T3→T2→T1. Probe fail → QUARANTINE + one-line cause; the failed
-  tier is a sticky floor; escalate normally. 2 escalations → raise the default.
+- 2 probe hits → the class's default tier drops permanently (rewrite the
+  entry's provenance to the new tier); counter resets, decay iterates
+  T3→T2→T1. Probe fail → QUARANTINE + one-line cause; the failed tier is a
+  sticky floor. One escalation = 2 failed acceptance runs at a tier ⇒ retry one
+  tier up; 2 escalations → raise the default.
 - `.tierdecay/` is written ONLY during DISTILL, never inside a task diff — and
   Plan mode can't write anyway, so keep DISTILL bookkeeping in Act mode.
-- Never apply a QUARANTINE entry. An entry contradicting the codebase is
-  reported `stale`, not improvised around.
+- Any acceptance failure while an entry was referenced → QUARANTINE it
+  immediately (probe or not). Never apply a QUARANTINE entry. An entry
+  contradicting the codebase is reported `stale`, not improvised around.
 - Playbook cap 150 lines: evict lowest hits, oldest first.
 - Distill decisions (invariants, ordering, the trap) — never diffs, secrets,
   or volatile business values. When in doubt, don't distill.

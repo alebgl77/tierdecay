@@ -55,21 +55,25 @@ docs, so treat it as superseded by Plan mode, not a separate mechanism.
 4. **VERIFY** — run the acceptance checks. Critical surfaces (security, auth,
    money, migrations, public contracts) get a T3-style review hunt — inverted
    logic, boundaries, races, injection, authz gaps, silent data loss. Verdict:
-   APPROVE / BLOCK + minimal fix.
+   APPROVE / APPROVE-WITH-NITS / BLOCK + minimal fix.
 5. **DISTILL** — close EVERY task with one ledger row:
    `| date | class | predicted | executed | outcome | esc | playbook |`.
+   **Class signature**: 2–4 hyphenated tokens `verb-object-surface`; reuse an
+   existing one before minting a new one. Full protocol: `.tierdecay/PROTOCOL.md`.
    After a T2/T3-grade success on a recurring class, add a ≤15-line playbook
    entry (WHEN / DO / VERIFY + provenance + hits). Update PRIORS at ≥3 rows.
 
 ## Decay + integrity (identical to core SPEC)
 
-- 2 probe hits → the class's default tier drops permanently; counter resets,
-  decay iterates T3→T2→T1. Probe fail → QUARANTINE + one-line cause; the
-  failed tier is a sticky floor; escalate normally. 2 escalations → raise the
-  default.
+- 2 probe hits → the class's default tier drops permanently (rewrite the
+  entry's provenance to the new tier); counter resets, decay iterates
+  T3→T2→T1. Probe fail → QUARANTINE + one-line cause; the failed tier is a
+  sticky floor. One escalation = 2 failed acceptance runs at a tier ⇒ retry one
+  tier up; 2 escalations → raise the default.
 - `.tierdecay/` is written ONLY during DISTILL, never inside a task diff.
-- Never apply a QUARANTINE entry. An entry contradicting the codebase is
-  reported `stale`, not improvised around.
+- Any acceptance failure while an entry was referenced → QUARANTINE it
+  immediately (probe or not). Never apply a QUARANTINE entry. An entry
+  contradicting the codebase is reported `stale`, not improvised around.
 - Playbook cap 150 lines: evict lowest hits, oldest first.
 - Distill decisions (invariants, ordering, the trap) — never diffs, secrets,
   or volatile business values. When in doubt, don't distill.

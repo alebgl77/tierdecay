@@ -13,10 +13,10 @@ jobs:
     name: Shellcheck & repo structure
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4 # pin to a SHA once Dependabot proposes it
 
-      - name: Shellcheck the installer
-        run: shellcheck -S warning install.sh
+      - name: Shellcheck all shell
+        run: shellcheck install.sh adapters/claude-code/.claude/hooks/*.sh
 
       - name: Required files present
         run: |
@@ -28,12 +28,14 @@ jobs:
           done
           echo "All required files present."
 
-      - name: Every adapter is complete
+      - name: Every adapter ships a native context file
         run: |
           set -euo pipefail
           for d in adapters/*/; do
             [ -f "${d}README.md" ] || { echo "::error::${d} has no README.md"; exit 1; }
-            if ! ls "${d}"*.md >/dev/null 2>&1; then
+            # Exclude README.md so the check actually proves a native context
+            # file (AGENTS.md/GEMINI.md/CLAUDE.md/CONVENTIONS.md) is shipped.
+            if ! find "$d" -maxdepth 1 -type f -name '*.md' ! -name 'README.md' | grep -q .; then
               echo "::error::${d} ships no native context file"; exit 1
             fi
           done
@@ -47,11 +49,13 @@ jobs:
           done
           echo "All README asset links resolve."
 
-      - name: Installer is executable
+      - name: Installer and guard are executable
         run: |
           set -euo pipefail
           [ -x install.sh ] || { echo "::error::install.sh is not executable (chmod +x)"; exit 1; }
-          echo "install.sh is executable."
+          [ -x adapters/claude-code/.claude/hooks/tierdecay-guard.sh ] \
+            || { echo "::error::integrity guard hook is not executable"; exit 1; }
+          echo "Executables OK."
 
       - name: Installer is idempotent (never clobbers learned state)
         run: |
@@ -97,6 +101,137 @@ jobs:
           if echo '{"tool_name":"Write","tool_input":{"file_path":".tierdecay/playbook.md"}}' | "$g" 2>/dev/null; then
             echo "::error::guard failed to block a state write"; exit 1
           fi
+          if echo '{"tool_name":"Bash","tool_input":{"command":"echo x >> .claude/routing-ledger.md"}}' | "$g" 2>/dev/null; then
+            echo "::error::guard failed to block a Bash state write"; exit 1
+          fi
           echo '{"tool_name":"Write","tool_input":{"file_path":"src/app.py"}}' | "$g" \
             || { echo "::error::guard blocked a legitimate write"; exit 1; }
-          echo "Enforcement intact: guard blocks state writes, passes normal ones."
+          # False-positive regressions: content may MENTION state paths as long
+          # as the target path is not state (e.g. SECURITY.md's own advice to
+          # add .tierdecay/ to .gitignore must be executable by an executor).
+          echo '{"tool_name":"Edit","tool_input":{"file_path":".gitignore","old_string":"node_modules/","new_string":"node_modules/\n.tierdecay/"}}' | "$g" \
+            || { echo "::error::guard blocked a legitimate .gitignore edit (content-only mention)"; exit 1; }
+          echo '{"tool_name":"Write","tool_input":{"file_path":"README.md","content":"state lives in .tierdecay/ledger.md"}}' | "$g" \
+            || { echo "::error::guard blocked a legitimate docs write (content-only mention)"; exit 1; }
+          echo "Enforcement intact: guard blocks state writes (file + Bash), passes normal and content-only-mention writes."
+
+  conformance:
+    name: Protocol conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4 # pin to a SHA once Dependabot proposes it
+
+      - name: Context files under the 120-line cap
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for f in adapters/*/AGENTS.md adapters/*/CLAUDE.md \
+                   adapters/*/GEMINI.md adapters/*/CONVENTIONS.md; do
+            n=$(wc -l < "$f")
+            [ "$n" -le 120 ] || { echo "::error::$f is $n lines (>120 cap)"; exit 1; }
+          done
+          echo "All context files within the 120-line cap."
+
+      - name: Adapter <-> installer parity
+        run: |
+          set -euo pipefail
+          declare -A map=( [agents-md]=agents [gemini-cli]=gemini [claude-code]=claude \
+                           [aider]=aider [cline]=cline [goose]=goose [windsurf]=windsurf \
+                           [cursor]=cursor )
+          for d in adapters/*/; do
+            name="$(basename "$d")"
+            t="${map[$name]:-$name}"
+            grep -qE "(^|[ (|])${t}[)|]" install.sh \
+              || { echo "::error::no install.sh case arm for adapter '$name' (target '$t')"; exit 1; }
+          done
+          echo "Every adapter has an install.sh case arm."
+
+      - name: Integrity invariants present in every non-native adapter
+        run: |
+          set -euo pipefail
+          nonnative=(adapters/agents-md/AGENTS.md adapters/aider/CONVENTIONS.md \
+                     adapters/gemini-cli/GEMINI.md adapters/cline/AGENTS.md \
+                     adapters/goose/AGENTS.md adapters/windsurf/AGENTS.md \
+                     adapters/cursor/AGENTS.md)
+          need=("150" "QUARANTINE" "verb-object-surface" "PROTOCOL.md" "any axis maxed")
+          for f in "${nonnative[@]}"; do
+            for tok in "${need[@]}"; do
+              grep -qF "$tok" "$f" || { echo "::error::$f is missing normative token: $tok"; exit 1; }
+            done
+          done
+          echo "All non-native adapters carry the normative tokens."
+
+  docs:
+    name: Docs integrity (offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4 # pin to a SHA once Dependabot proposes it
+
+      - name: Mermaid fences are balanced
+        run: |
+          set -euo pipefail
+          opens=$(grep -cE '^```mermaid' README.md || true)
+          closes=$(grep -cE '^```$' README.md || true)
+          [ "$opens" -ge 1 ] || { echo "::error::no mermaid diagrams found in README"; exit 1; }
+          [ "$closes" -ge "$opens" ] || { echo "::error::unbalanced mermaid code fences"; exit 1; }
+          echo "Mermaid fences balanced ($opens diagrams)."
+
+      - name: Internal relative links resolve
+        run: |
+          set -euo pipefail
+          # Extract markdown links to relative paths (skip http(s), #anchors, mailto).
+          miss=0
+          while IFS= read -r target; do
+            case "$target" in
+              http*|\#*|mailto:*|"") continue ;;
+            esac
+            path="${target%%#*}"
+            [ -n "$path" ] || continue
+            [ -e "$path" ] || { echo "::error::README links to missing path: $path"; miss=1; }
+          done < <(grep -oE '\]\(([^)]+)\)' README.md | sed -E 's/^\]\(([^)]+)\)$/\1/')
+          [ "$miss" = 0 ] || exit 1
+          echo "All internal relative links resolve."
+
+  install-matrix:
+    name: Installer ${{ matrix.target }} on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        target: [claude, agents, cursor, gemini, aider, cline, goose, windsurf]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4 # pin to a SHA once Dependabot proposes it
+
+      - name: Install, then re-run to prove idempotence (no clobber)
+        run: |
+          set -euo pipefail
+          t="${{ matrix.target }}"
+          scratch="$(mktemp -d)"
+          cd "$scratch"
+
+          "$GITHUB_WORKSPACE/install.sh" "$t"
+
+          # A context file must land (at least one of the four).
+          found=""
+          for c in CLAUDE.md AGENTS.md GEMINI.md CONVENTIONS.md; do
+            [ -f "$c" ] && found=1
+          done
+          [ -n "$found" ] || { echo "::error::$t: no context file installed"; exit 1; }
+
+          # State must exist (native → .claude/, others → .tierdecay/).
+          if [ "$t" = "claude" ]; then
+            state=".claude/routing-ledger.md"
+          else
+            state=".tierdecay/ledger.md"
+            [ -f ".tierdecay/playbook.md" ] || { echo "::error::$t: playbook not seeded"; exit 1; }
+          fi
+          [ -f "$state" ] || { echo "::error::$t: state file $state not seeded"; exit 1; }
+
+          # THE regression guard: learned state must survive a re-install.
+          echo "LEARNED_$t" >> "$state"
+          "$GITHUB_WORKSPACE/install.sh" "$t"
+          grep -q "LEARNED_$t" "$state" \
+            || { echo "::error::$t: re-install CLOBBERED learned state ($state)"; exit 1; }
+
+          echo "$t: install + idempotent re-install OK on ${{ matrix.os }}."

@@ -18,8 +18,12 @@ body:
       options:
         - claude-code
         - agents-md
+        - cursor
         - gemini-cli
         - aider
+        - cline
+        - goose
+        - windsurf
         - core/other
     validations:
       required: true

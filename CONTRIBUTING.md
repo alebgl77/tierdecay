@@ -20,8 +20,8 @@ is welcome.
 
 ## Add an adapter
 
-**Adapters wanted:** Qwen Code, Amp, Continue, Cody. (Cline, Goose, and
-Windsurf now ship in-tree — use them as worked examples.)
+**Adapters wanted:** Qwen Code, Amp, Continue, Cody. (Cline, Goose, Windsurf,
+and Cursor now ship in-tree — use them as worked examples.)
 
 An adapter is one folder under `adapters/` containing:
 
@@ -70,7 +70,7 @@ high-tier solve should have somewhere to write its first ledger row.
 
 No test harness — verification is manual and takes a minute:
 
-- `shellcheck install.sh` — the installer is POSIX bash; keep it clean.
+- `shellcheck install.sh` — the installer is Bash; keep it clean.
 - Install into a scratch repo and confirm files land:
 
   ```bash

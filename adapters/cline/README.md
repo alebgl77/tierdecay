@@ -1,7 +1,7 @@
 # Cline adapter
 
 ```bash
-../../install.sh cline
+/path/to/tierdecay/install.sh cline   # run from the repo you want to equip
 ```
 Copies `AGENTS.md` to your repo root (Cline auto-detects it) and seeds
 `.tierdecay/`. Prefer a repo-local rule? Move the file to `.clinerules/tierdecay.md`

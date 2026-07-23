@@ -1,7 +1,7 @@
 # Aider adapter
 
 ```bash
-../../install.sh aider
+/path/to/tierdecay/install.sh aider   # run from the repo you want to equip
 # then run aider as a two-tier router:
 aider --architect \
       --model <your-frontier-model> \

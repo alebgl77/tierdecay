@@ -157,8 +157,12 @@ self-poisoning. TierDecay ships with the antibodies:
 ## Quick start
 
 ```bash
-git clone https://github.com/alebgl77/tierdecay && cd tierdecay
-./install.sh <claude|agents|gemini|aider|cline|goose|windsurf>   # or: ./install.sh auto
+git clone https://github.com/alebgl77/tierdecay
+cd your-project        # the repo you want to equip — NOT the tierdecay checkout
+../tierdecay/install.sh auto
+# or pick one explicitly:
+../tierdecay/install.sh <claude|agents|cursor|gemini|aider|cline|goose|windsurf>
+# preview without writing: ../tierdecay/install.sh --dry-run <target>
 ```
 
 <details>
@@ -171,7 +175,7 @@ is **preloaded** into both executors via the `skills:` frontmatter. See
 </details>
 
 <details>
-<summary><b>Codex CLI · Cursor · OpenCode · Copilot · Zed</b> (AGENTS.md)</summary>
+<summary><b>Codex CLI · OpenCode · Copilot · Zed</b> (AGENTS.md)</summary>
 
 One `AGENTS.md` speaks to every CLI that adopted the standard. Single-agent
 mode: phases replace subagents, model switching via your CLI's mechanism
@@ -195,14 +199,17 @@ the playbook, and the decay rules on top. See
 </details>
 
 <details>
-<summary><b>Cline · Goose · Windsurf</b> (AGENTS.md + native model binding)</summary>
+<summary><b>Cline · Goose · Windsurf · Cursor</b> (AGENTS.md + native model binding)</summary>
 
 Each ships an `AGENTS.md` these tools read natively, mapped to their own model
 controls: **Cline** binds T3 → Plan-mode model, T1 → Act-mode model;
 **Goose** binds T3 → the `/plan` planner model, T1/T2 → the default
 `GOOSE_MODEL`; **Windsurf** runs single-agent phase mode via its per-message
-model picker. See [`adapters/cline/`](adapters/cline/),
-[`adapters/goose/`](adapters/goose/), [`adapters/windsurf/`](adapters/windsurf/).
+model picker; **Cursor** reads `AGENTS.md` natively (root + nested) and maps
+tiers onto its per-conversation / per-surface model picker (or a Project Rule
+at `.cursor/rules/tierdecay.mdc`). See [`adapters/cline/`](adapters/cline/),
+[`adapters/goose/`](adapters/goose/), [`adapters/windsurf/`](adapters/windsurf/),
+[`adapters/cursor/`](adapters/cursor/).
 </details>
 
 ## What TierDecay is not

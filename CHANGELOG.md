@@ -14,8 +14,45 @@ and this project adheres to [Semantic Versioning][semver].
   model, Windsurf per-message model picker) — plus their `install.sh` cases.
   Built by dogfooding TierDecay on itself; the real routing ledger from that
   session is in `examples/self-build/`.
+- `cursor` adapter — ships an `AGENTS.md` Cursor reads natively at the repo root
+  and in nested subdirectories (or a Project Rule at `.cursor/rules/tierdecay.mdc`
+  with `alwaysApply: true`), mapping tiers onto Cursor's per-conversation /
+  per-surface model picker (Agent/Ask/Plan modes). Adds an `install.sh` case,
+  `.cursor/` auto-detection, and CI matrix + conformance coverage.
+- `install.sh` flags: `--help`, `--version`, `--dry-run` (preview every write),
+  `--uninstall` (removes context files, never touches learned state).
+- Non-native installs now ship the full spec as `.tierdecay/PROTOCOL.md`, so
+  class-signature discipline and the §5 invariants travel with every adapter.
+- CI: an `install-matrix` job (ubuntu + macos × 8 targets) asserting install
+  **and** idempotent re-install (learned state must survive); a `conformance`
+  job (120-line caps, adapter↔installer parity, normative-token presence in
+  every non-native adapter); an offline `docs` job (mermaid fence balance,
+  internal link resolution); a `release.yml` workflow guarding
+  tag↔CHANGELOG↔CITATION coherence; `dependabot.yml` for actions updates.
+- Claude Code adapter: a `PreToolUse` guard hook
+  (`.claude/hooks/tierdecay-guard.sh`) wired into both executors' frontmatter
+  blocks executor calls referencing `.claude/` or `.tierdecay/` at the tool
+  layer (Write/Edit/MultiEdit/NotebookEdit/Bash).
 
 ### Changed
+
+- `install.sh` rewritten around non-destructive `copy_safe`/`copy_tree`
+  helpers: one collision policy everywhere (sidecar `*.tierdecay`, pending
+  sidecars preserved), no reliance on `cp -n` semantics.
+- `detect()` now reads project signals (`.claude/`, `.cursor/`, `.clinerules/`,
+  `.windsurf/`, `.goosehints`, `GEMINI.md`, `CONVENTIONS.md`, `AGENTS.md`)
+  before machine-global binaries, and can resolve cursor/cline/goose/windsurf.
+- SPEC: PROBE now explicitly outranks PRIORS while a live entry exists, and a
+  downgrade rewrites the entry's provenance — the T3→T2→T1 iteration has an
+  operational path; escalation trigger (2 failed acceptance runs = 1
+  escalation) defined; `≤400 words` recon cap and `keep last 50` ledger
+  retention lifted into the spec.
+- All 6 non-native adapters now carry invariant §5.2 (quarantine on ANY
+  acceptance failure), the escalation trigger, class-signature discipline, the
+  `any axis maxed → T3` clause, and the full APPROVE / APPROVE-WITH-NITS /
+  BLOCK verdict vocabulary.
+- Cline adapter: T0 recon explicitly assigned to Plan mode (read-only safety
+  over model cost), resolving the tier-map contradiction.
 
 ### Deprecated
 
@@ -40,15 +77,36 @@ and this project adheres to [Semantic Versioning][semver].
 
 ### Fixed
 
-- `install.sh` (claude target): replaced `cp -rn || cp -r` with a
-  file-by-file copy through `copy_safe`. On coreutils >= 9.2, `cp -n` exits
-  nonzero when it skips an existing file, so the old fallback silently
-  clobbered `.claude/` on reinstall — including the routing ledger and
-  playbook. Existing files are now always preserved, with the incoming
-  version written as a `.tierdecay` sidecar; CI gained an idempotence test
-  guarding the behaviour.
-
-### Security
+- **Guard hook false positives**: the `PreToolUse` guard judged the entire
+  tool payload, so any legitimate write whose *content* merely mentioned
+  `.claude/` or `.tierdecay/` was blocked — including adding `.tierdecay/` to
+  `.gitignore`, the exact choice SECURITY.md recommends. File tools are now
+  judged by their target path only; Bash is still judged by its command
+  string. CI carries the false-positive regressions.
+- `release.yml` now builds the release archive and its `SHA256SUMS`
+  (`sha256sum -c` compatible, same format as the v0.1.0 assets) so future
+  releases keep the verification contract documented in SECURITY.md, and
+  guards that `install.sh`'s `VERSION` constant matches the tag.
+- Adapter READMEs showed a copy-pasteable install command
+  (`../../install.sh <target>`) that fails from the repo being equipped;
+  aligned on `/path/to/tierdecay/install.sh <target>`.
+- **install.sh could destroy learned state**: the `claude` target's
+  `cp -rn … || cp -r …` fallback silently overwrote an existing `.claude/`
+  (routing ledger and playbook included) on GNU coreutils ≥ 9.2, where `cp -n`
+  exits non-zero when skipping. Replaced with a guarded per-file walk through
+  `copy_safe` — existing files are always preserved and a differing incoming
+  version lands as a `.tierdecay` sidecar; regression-tested in CI (idempotence
+  test + full install matrix).
+- Quick-start commands no longer `cd` into the checkout (which guaranteed the
+  installer's self-install guard would abort) and now list all 8 targets.
+- CI "Every adapter is complete" check was vacuous (the `*.md` glob matched
+  `README.md` itself); it now excludes the README and actually fails on a
+  missing context file.
+- `adapter_request.yml`: unquoted `- Yes` parsed as a YAML boolean, breaking
+  the dropdown; quoted. Bug-report dropdown now lists all adapters.
+- `examples/self-build/playbook.md` made SPEC-conformant (provenance rewritten
+  to T1, hit counter reset after downgrade).
+- Docs no longer call the Bash installer "POSIX".
 
 ## [0.1.0] - 2026-07-12
 
@@ -78,8 +136,8 @@ Initial public release.
   T2/T3 and Flash to T1/T0.
 - `aider` adapter (`adapters/aider/`): `CONVENTIONS.md` layering the ledger,
   playbook, and decay rules on top of Aider's architect/editor split.
-- `install.sh`: a POSIX installer that copies the right adapter (or all of
-  them, via `auto`) into a target repo.
+- `install.sh`: a Bash installer that copies the right adapter (auto-detects
+  one from project signals, via `auto`) into a target repo.
 - Visual assets (`assets/`): logo, hero image, three-files diagram,
   economics staircase, review and loop illustrations, and a social card.
 - Integrity guarantees documented in the spec: only the orchestrator writes

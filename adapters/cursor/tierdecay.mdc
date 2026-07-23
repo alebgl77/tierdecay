@@ -1,0 +1,24 @@
+---
+description: TierDecay protocol — tier routing, decay, and integrity invariants (always on)
+alwaysApply: true
+---
+
+# TierDecay (always-on Project Rule)
+
+This repo runs under the TierDecay protocol. The full adapter lives in
+`AGENTS.md` at the repo root — treat every rule in it as binding, in
+particular:
+
+- Phase discipline: RECON → PLAN → EXECUTE → VERIFY → DISTILL; announce the
+  current phase and route BEFORE touching code (playbook PROBE outranks ledger
+  PRIORS; otherwise score the 4-axis rubric — ≥7 or any axis maxed = T3).
+- State integrity: `.tierdecay/` is written ONLY during DISTILL. Any acceptance
+  failure while a playbook entry was referenced → QUARANTINE it immediately.
+  Never apply a QUARANTINE entry. Playbook hard cap: 150 lines.
+- Every task closes with one ledger row in `.tierdecay/ledger.md`
+  (class signature: 2–4 hyphenated tokens, `verb-object-surface` — reuse
+  existing signatures). Full protocol reference: `.tierdecay/PROTOCOL.md`.
+
+This rule exists so the protocol stays in context on every request even if
+`AGENTS.md` auto-loading is disabled or trimmed. It intentionally duplicates
+no detail: `AGENTS.md` is the single source of truth.
