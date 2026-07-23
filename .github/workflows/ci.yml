@@ -13,7 +13,7 @@ jobs:
     name: Shellcheck & repo structure
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # pin to a SHA once Dependabot proposes it
+      - uses: actions/checkout@v7 # pin to a SHA once Dependabot proposes it
 
       - name: Shellcheck all shell
         run: shellcheck install.sh adapters/claude-code/.claude/hooks/*.sh
@@ -119,7 +119,7 @@ jobs:
     name: Protocol conformance
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # pin to a SHA once Dependabot proposes it
+      - uses: actions/checkout@v7 # pin to a SHA once Dependabot proposes it
 
       - name: Context files under the 120-line cap
         run: |
@@ -165,7 +165,7 @@ jobs:
     name: Docs integrity (offline)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # pin to a SHA once Dependabot proposes it
+      - uses: actions/checkout@v7 # pin to a SHA once Dependabot proposes it
 
       - name: Mermaid fences are balanced
         run: |
@@ -201,7 +201,7 @@ jobs:
         target: [claude, agents, cursor, gemini, aider, cline, goose, windsurf]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4 # pin to a SHA once Dependabot proposes it
+      - uses: actions/checkout@v7 # pin to a SHA once Dependabot proposes it
 
       - name: Install, then re-run to prove idempotence (no clobber)
         run: |
