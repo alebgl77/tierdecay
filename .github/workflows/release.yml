@@ -13,7 +13,7 @@ jobs:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # pin to a SHA once Dependabot proposes it
+      - uses: actions/checkout@v7 # pin to a SHA once Dependabot proposes it
 
       - name: Guard tag <-> CHANGELOG <-> CITATION.cff coherence
         run: |
