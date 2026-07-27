@@ -156,6 +156,11 @@ self-poisoning. TierDecay ships with the antibodies:
 
 ## Quick start
 
+**Prerequisites:** one of the supported CLIs, and `bash` to run the installer —
+already present on macOS and Linux; on **Windows** use Git Bash or WSL. No
+runtime, no package manager, no API key. Nothing is installed globally: the
+installer only copies files into the repo you point it at.
+
 ```bash
 git clone https://github.com/alebgl77/tierdecay
 cd your-project        # the repo you want to equip — NOT the tierdecay checkout
@@ -165,13 +170,18 @@ cd your-project        # the repo you want to equip — NOT the tierdecay checko
 # preview without writing: ../tierdecay/install.sh --dry-run <target>
 ```
 
+No bash at all? Every adapter is plain markdown — copy the files from
+`adapters/<your-cli>/` to your repo root by hand and you have the same result.
+
 <details>
 <summary><b>Claude Code</b> (native — full 4-agent pipeline)</summary>
 
-Copies `CLAUDE.md` + `.claude/` (4 subagents bound to fable/opus/sonnet/haiku,
-4 skills, the state-write guard hook, ledger) to your repo root. The playbook
-is **preloaded** into both executors via the `skills:` frontmatter. See
-[`adapters/claude-code/`](adapters/claude-code/).
+Copies `CLAUDE.md` + `.claude/` (4 subagents, 4 skills, the state-write guard
+hook, ledger) to your repo root. Tiers bind through the `opus` / `sonnet` /
+`haiku` aliases — **no special plan access required**, and a new model release
+is picked up automatically. The playbook is **preloaded** into both executors
+via the `skills:` frontmatter. See [`adapters/claude-code/`](adapters/claude-code/)
+and [`core/MODELS.md`](core/MODELS.md) for the optional frontier-tier upgrade.
 </details>
 
 <details>
