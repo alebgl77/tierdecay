@@ -9,14 +9,38 @@ CI enforces this: a versioned model string (`Opus 4.8`, `claude-sonnet-4-6`, …
 appearing anywhere outside this file, the changelog, or a historical ledger
 fails the `conformance` job.
 
-## Current bindings (Anthropic — updated 2026-07-24)
+## Default bindings — work on any paid Claude Code plan (updated 2026-07-24)
+
+The shipped adapter uses only models available to every paid plan, so a fresh
+install runs out of the box. T3 and T2 share the `opus` alias: the tiers stay
+distinct as **roles** (T3 specs and reviews, T2 implements) even where the model
+is the same.
 
 | Tier | Role | Claude Code alias | Concrete model today |
 |---|---|---|---|
-| T3 | frontier reasoning: plan, architect, review | `fable` | Claude Fable 5 |
+| T3 | plan, architect, review critical diffs | `opus` | Claude Opus 5 |
 | T2 | strong workhorse: refactors, concurrency, perf | `opus` | Claude Opus 5 |
 | T1 | fast/cheap: specced features, tests, docs | `sonnet` | Claude Sonnet 5 |
 | T0 | cheapest: read-only recon | `haiku` | Claude Haiku 4.5 |
+
+### Optional upgrade: a distinct frontier tier
+
+If your plan or org has access to a model above Opus, bind T3 to it and the four
+tiers become four distinct models. Two edits, both in the installed `.claude/`:
+
+```jsonc
+// .claude/settings.json  — the orchestrator (main thread)
+{ "model": "fable" }
+```
+```yaml
+# .claude/agents/oracle.md frontmatter — the reviewer
+model: fable
+```
+
+Everything else is unchanged: `heavy-executor` stays `opus`, `executor` stays
+`sonnet`, `scout` stays `haiku`. If the alias is not available to your account,
+Claude Code will tell you at session start — revert those two edits and you are
+back on the universal default.
 
 ## Prefer aliases over pinned IDs
 

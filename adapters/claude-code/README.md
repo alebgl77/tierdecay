@@ -33,10 +33,12 @@ Anti-poisoning defenses (the failure mode of any self-modifying system):
 ## Install
 1. Copy `CLAUDE.md` and the `.claude/` directory to your repo root (merge with
    any existing config).
-2. Requires a plan/org with frontier-tier access — check with `/model`.
-3. Start `claude`: the main thread runs the frontier tier via
-   `.claude/settings.json` (`"model": "fable"`). Per-session override:
-   `/model fable`.
+2. **No special access needed** — the default binds only models available on any
+   paid Claude Code plan (`opus` / `sonnet` / `haiku`). Check yours with `/model`.
+3. Start `claude`: the main thread runs the top tier via `.claude/settings.json`
+   (`"model": "opus"`). Per-session override: `/model opus`.
+   Have access to a model above Opus? See the optional frontier-tier upgrade in
+   [`core/MODELS.md`](../../core/MODELS.md) — two lines, fully optional.
 4. Enable extended thinking in the session (Tab); in current Claude Code
    versions subagents inherit the main conversation's thinking configuration.
 
@@ -72,7 +74,7 @@ Claude Code ignores it for agents loaded from plugins.
 - Ask for a multi-step feature. Expected behavior: scout recon → plan with
   [T1]/[T2]/[T3] tags → dispatch → verification → oracle review on critical
   diffs.
-- If every subagent runs on the frontier model, the per-agent `model:`
+- If every subagent runs on the same model, the per-agent `model:`
   binding isn't taking effect — name the model explicitly when you dispatch
   (pass it in the Agent call). Avoid `CLAUDE_CODE_SUBAGENT_MODEL`: it forces
   ALL subagents onto one model and destroys the tiering.
@@ -85,9 +87,9 @@ Claude Code ignores it for agents loaded from plugins.
   edit here. Current bindings and pinning guidance live in one file:
   [`core/MODELS.md`](../../core/MODELS.md) (installed as `.tierdecay/MODELS.md`).
   Pin an exact ID only for reproducibility — a pin freezes that tier.
-- No frontier-tier access? Set `settings.json` model to `opusplan` and `oracle`
-  to `opus` — the protocol degrades gracefully (the strong tier plans, the fast
-  tier executes).
+- Want the orchestrator to plan on a bigger model than it executes with? Set
+  `settings.json` to `opusplan` — Claude Code plans on the top tier and drops to
+  the fast tier to execute.
 - The `skills:` field in executor frontmatter preloads `execution-standards`
   into their context at startup — edit that one file to change the discipline
   of both executors at once.

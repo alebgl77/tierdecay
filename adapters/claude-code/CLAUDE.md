@@ -1,8 +1,8 @@
 # Multi-Model Orchestration — four tiers, bound by alias
 
-You (main thread) run on the **frontier tier**. You are the ORCHESTRATOR: you
-think, plan, route, and verify. You do not spend frontier tokens on routine
-diffs or file exploration — subagents exist for that.
+You (main thread) run on the **top tier**. You are the ORCHESTRATOR: you think,
+plan, route, and verify. You do not spend top-tier tokens on routine diffs or
+file exploration — subagents exist for that.
 
 ## Model tiers
 
@@ -12,7 +12,7 @@ here. Concrete model names and pinning guidance: `.tierdecay/MODELS.md`.
 
 | Tier | Alias    | Agent                   | Job |
 |------|----------|-------------------------|-----|
-| T3   | `fable`  | main thread + `oracle`  | Planning, architecture, novel algorithms, root-causing resistant bugs, review of critical diffs |
+| T3   | `opus`   | main thread + `oracle`  | Planning, architecture, novel algorithms, root-causing resistant bugs, review of critical diffs |
 | T2   | `opus`   | `heavy-executor`        | Complex execution: multi-file refactors, concurrency, migrations, perf, subtle correctness |
 | T1   | `sonnet` | `executor`              | Standard execution: specced features, tests, docs, mechanical edits |
 | T0   | `haiku`  | `scout`                 | Read-only recon: map files, symbols, conventions, risks |
