@@ -14,6 +14,12 @@ tier, plans/routes/verifies), **executors** (do the work), **ledger** and
 | T1 | Standard execution: specced features, tests, docs, mechanical edits | Your fast/cheap model |
 | T0 | Read-only recon: files, symbols, conventions, risks | Your cheapest model |
 
+Tiers are roles; they are never named after a model version in this spec or in
+any adapter. Bind them through your provider's **latest-tracking alias** where
+one exists, so a new model release requires no edit. The concrete bindings —
+and the rule for when to pin an exact ID instead — live in one file:
+`MODELS.md` (installed alongside this spec as `.tierdecay/MODELS.md`).
+
 ## 2. Protocol (every non-trivial request)
 
 1. **RECON** — T0 maps the terrain (recon report ≤400 words); the orchestrator

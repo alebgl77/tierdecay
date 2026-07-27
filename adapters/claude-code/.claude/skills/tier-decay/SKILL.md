@@ -1,6 +1,6 @@
 ---
 name: tier-decay
-description: Post-completion distillation protocol that converts Opus/Fable solutions into cheaper-tier playbook entries and recalibrates routing from real outcomes. Use after completing any [T2] or [T3] task, when logging a task outcome to the routing ledger, when a playbook probe passes or fails, or when a class keeps escalating.
+description: Post-completion distillation protocol that converts high-tier solutions into cheaper-tier playbook entries and recalibrates routing from real outcomes. Use after completing any [T2] or [T3] task, when logging a task outcome to the routing ledger, when a playbook probe passes or fails, or when a class keeps escalating.
 ---
 
 # Tier Decay — amortize reasoning
@@ -66,7 +66,7 @@ RAISED one tier in PRIORS. Calibration runs both directions.
 
 ## 6. Economics
 
-Break-even ≈ first reuse: one Opus-priced solve buys every future
-Sonnet-priced execution of its class. Health check: the `executed` column in
+Break-even ≈ first reuse: one high-tier-priced solve buys every future
+fast-tier-priced execution of its class. Health check: the `executed` column in
 the LOG should drift toward T1 over time for recurring classes — that drift
 IS the optimization working.

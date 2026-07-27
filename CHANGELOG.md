@@ -34,8 +34,26 @@ and this project adheres to [Semantic Versioning][semver].
   blocks executor calls referencing `.claude/` or `.tierdecay/` at the tool
   layer (Write/Edit/MultiEdit/NotebookEdit/Bash).
 
+- `core/MODELS.md` — the single source of truth for tier→model bindings, and the
+  only file in the tree allowed to name a model version. Installed to every
+  target as `.tierdecay/MODELS.md`. A new model release is now a one-row edit
+  here instead of a sweep across adapters, skills, and agent descriptions.
+- CI `conformance`: a guard that fails the build if a versioned model string
+  (`claude-opus-5`, `Sonnet 4.6`, …) appears anywhere outside `core/MODELS.md`,
+  the changelog, or a historical ledger. This is the mechanism that keeps the
+  tree from going stale at the next release; it caught a stale placeholder in
+  the bug-report template on its first run.
+
 ### Changed
 
+- **Model bindings are now expressed as tiers + provider aliases, never version
+  numbers.** Adapters, skills, and agent descriptions name roles (frontier /
+  strong workhorse / fast / cheapest) and bind through the `fable`, `opus`,
+  `sonnet`, `haiku` aliases, which resolve to the latest model in each family at
+  session start — so a new release is picked up with no edit. Current bindings:
+  Claude Fable 5 (T3), Claude Opus 5 (T2), Claude Sonnet 5 (T1), Claude Haiku
+  4.5 (T0). `examples/self-build/` keeps the model names that session actually
+  ran on — it is a historical record, not a live binding.
 - `install.sh` rewritten around non-destructive `copy_safe`/`copy_tree`
   helpers: one collision policy everywhere (sidecar `*.tierdecay`, pending
   sidecars preserved), no reliance on `cp -n` semantics.

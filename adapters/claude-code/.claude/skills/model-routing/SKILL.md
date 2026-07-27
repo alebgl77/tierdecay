@@ -1,6 +1,6 @@
 ---
 name: model-routing
-description: Complexity-based routing of tasks across Fable 5 (T3), Opus 4.8 (T2), Sonnet 4.6 (T1) and Haiku recon (T0). Use when planning any multi-step work, when deciding which subagent should execute a task, when writing a dispatch brief, or when an executor fails and escalation is needed.
+description: Complexity-based routing of tasks across four model tiers — frontier (T3), strong workhorse (T2), fast executor (T1), cheapest recon (T0). Use when planning any multi-step work, when deciding which subagent should execute a task, when writing a dispatch brief, or when an executor fails and escalation is needed.
 ---
 
 # Model Routing
@@ -28,10 +28,10 @@ Score the task on four axes; sum the points.
 | Risk surface    | cosmetic        | user-visible bug | data / perf / concurrency      | security, money, irreversible |
 
 Route:
-- **0–3 → [T1]** `executor` (Sonnet 4.6)
-- **4–6 → [T2]** `heavy-executor` (Opus 4.8)
-- **≥7, or any axis at its maximum → [T3]**: Fable produces the spec (main
-  thread, or `oracle` SOLVE) → `heavy-executor` implements it → `oracle`
+- **0–3 → [T1]** `executor` (fast tier)
+- **4–6 → [T2]** `heavy-executor` (strong workhorse)
+- **≥7, or any axis at its maximum → [T3]**: the frontier tier produces the spec
+  (main thread, or `oracle` SOLVE) → `heavy-executor` implements it → `oracle`
   REVIEWs the diff.
 
 Tie-breaks: strong existing test coverage → down one tier. Critical path, or
@@ -82,5 +82,5 @@ unless provably disjoint.
 
 ## 6. Cost discipline
 
-Fable = decisions, specs, reviews. If the main thread is about to write >30
+Frontier tier = decisions, specs, reviews. If the main thread is about to write >30
 lines of routine code or read a 5th file, stop — that is a dispatch.

@@ -1,4 +1,4 @@
-# Claude Code adapter (native) — Fable 5 / Opus 4.8 / Sonnet 4.6
+# Claude Code adapter (native) — four tiers, bound by alias
 
 ## Tier Decay — the self-distilling router
 
@@ -33,9 +33,10 @@ Anti-poisoning defenses (the failure mode of any self-modifying system):
 ## Install
 1. Copy `CLAUDE.md` and the `.claude/` directory to your repo root (merge with
    any existing config).
-2. Requires a plan/org with Fable 5 access — check with `/model`.
-3. Start `claude`: the main thread runs Fable 5 via `.claude/settings.json`.
-   Per-session override: `/model fable`.
+2. Requires a plan/org with frontier-tier access — check with `/model`.
+3. Start `claude`: the main thread runs the frontier tier via
+   `.claude/settings.json` (`"model": "fable"`). Per-session override:
+   `/model fable`.
 4. Enable extended thinking in the session (Tab); in current Claude Code
    versions subagents inherit the main conversation's thinking configuration.
 
@@ -77,13 +78,16 @@ Claude Code ignores it for agents loaded from plugins.
   ALL subagents onto one model and destroys the tiering.
 
 ## Tuning
-- Scout runs on Haiku for cheap recon (same pattern as the built-in Explore
-  agent). If recon reports feel shallow, bump it to `sonnet`.
-- Aliases (`fable`, `opus`, `sonnet`, `haiku`) track the latest models. To pin
-  exact versions instead: `claude-fable-5`, `claude-opus-4-8`,
-  `claude-sonnet-4-6`.
-- No Fable access? Set `settings.json` model to `opusplan` and `oracle` to
-  `opus` — the protocol degrades gracefully (Opus plans, Sonnet executes).
+- Scout runs on the `haiku` alias for cheap recon (same pattern as the built-in
+  Explore agent). If recon reports feel shallow, bump it to `sonnet`.
+- **Aliases are the point.** `fable`, `opus`, `sonnet`, and `haiku` resolve to
+  the latest model in each family at session start, so a new release needs no
+  edit here. Current bindings and pinning guidance live in one file:
+  [`core/MODELS.md`](../../core/MODELS.md) (installed as `.tierdecay/MODELS.md`).
+  Pin an exact ID only for reproducibility — a pin freezes that tier.
+- No frontier-tier access? Set `settings.json` model to `opusplan` and `oracle`
+  to `opus` — the protocol degrades gracefully (the strong tier plans, the fast
+  tier executes).
 - The `skills:` field in executor frontmatter preloads `execution-standards`
   into their context at startup — edit that one file to change the discipline
   of both executors at once.
