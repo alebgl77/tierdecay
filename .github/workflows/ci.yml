@@ -146,6 +146,27 @@ jobs:
           done
           echo "Every adapter has an install.sh case arm."
 
+      - name: No model versions outside core/MODELS.md
+        run: |
+          set -euo pipefail
+          # Tiers are roles. A named model version anywhere else is drift waiting
+          # to happen: it goes stale the day a new model ships. core/MODELS.md is
+          # the single source of truth; CHANGELOG and examples/self-build are
+          # historical records (rewriting them would falsify a real ledger).
+          pattern='claude-(opus|sonnet|haiku|fable|mythos)-[0-9]|(Opus|Sonnet|Haiku|Fable|Mythos) [0-9]+\.?[0-9]*'
+          if grep -rInE "$pattern" \
+               --include='*.md' --include='*.yml' --include='*.yaml' \
+               --include='*.json' --include='*.sh' . \
+               | grep -v '^\./core/MODELS\.md:' \
+               | grep -v '^\./CHANGELOG\.md:' \
+               | grep -v '^\./examples/self-build/' \
+               | grep -v '^\./\.github/workflows/ci\.yml:' ; then
+            echo "::error::model version named outside core/MODELS.md (see matches above)"
+            echo "::error::bind tiers by role/alias instead; update core/MODELS.md when a model ships"
+            exit 1
+          fi
+          echo "No model versions outside core/MODELS.md."
+
       - name: Integrity invariants present in every non-native adapter
         run: |
           set -euo pipefail

@@ -34,7 +34,7 @@ body:
       description: >
         Which CLI, and which concrete models are bound to the tiers?
         Give the frontier / strong / fast / cheapest mapping (T3 / T2 / T1 / T0).
-      placeholder: "e.g. Claude Code — T3 claude-fable-5 / T2 claude-opus-4-8 / T1 claude-sonnet-4-6 / T0 claude-haiku-4-5"
+      placeholder: "e.g. Claude Code — T3 fable / T2 opus / T1 sonnet / T0 haiku (aliases), or the exact model IDs if you pinned them"
     validations:
       required: true
   - type: textarea

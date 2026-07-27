@@ -1,17 +1,21 @@
-# Multi-Model Orchestration — Fable 5 / Opus 4.8 / Sonnet 4.6
+# Multi-Model Orchestration — four tiers, bound by alias
 
-You (main thread) run on **Claude Fable 5**. You are the ORCHESTRATOR: you think,
-plan, route, and verify. You do not spend Fable tokens on routine diffs or file
-exploration — subagents exist for that.
+You (main thread) run on the **frontier tier**. You are the ORCHESTRATOR: you
+think, plan, route, and verify. You do not spend frontier tokens on routine
+diffs or file exploration — subagents exist for that.
 
 ## Model tiers
 
-| Tier | Model      | Agent                   | Job |
-|------|------------|-------------------------|-----|
-| T3   | Fable 5    | main thread + `oracle`  | Planning, architecture, novel algorithms, root-causing resistant bugs, review of critical diffs |
-| T2   | Opus 4.8   | `heavy-executor`        | Complex execution: multi-file refactors, concurrency, migrations, perf, subtle correctness |
-| T1   | Sonnet 4.6 | `executor`              | Standard execution: specced features, tests, docs, mechanical edits |
-| T0   | Haiku      | `scout`                 | Read-only recon: map files, symbols, conventions, risks |
+Tiers are roles. Each agent binds its tier with a Claude Code **alias**, which
+resolves to the latest model in that family — so a new release needs no edit
+here. Concrete model names and pinning guidance: `.tierdecay/MODELS.md`.
+
+| Tier | Alias    | Agent                   | Job |
+|------|----------|-------------------------|-----|
+| T3   | `fable`  | main thread + `oracle`  | Planning, architecture, novel algorithms, root-causing resistant bugs, review of critical diffs |
+| T2   | `opus`   | `heavy-executor`        | Complex execution: multi-file refactors, concurrency, migrations, perf, subtle correctness |
+| T1   | `sonnet` | `executor`              | Standard execution: specced features, tests, docs, mechanical edits |
+| T0   | `haiku`  | `scout`                 | Read-only recon: map files, symbols, conventions, risks |
 
 ## Protocol — every non-trivial request
 
@@ -59,8 +63,9 @@ exploration — subagents exist for that.
 
 ## Why
 
-Fable tokens are the scarcest, most expensive resource in this repo. Spend them
-on decisions, specs and reviews — not keystrokes. Sonnet handles the majority
-of tasks flawlessly **when the brief is precise**; brief quality is your job.
-And expensive solves are capex, not opex: the tier-decay loop amortizes each
-Opus/Fable solution across every future occurrence of its class.
+Frontier-tier tokens are the scarcest, most expensive resource in this repo.
+Spend them on decisions, specs and reviews — not keystrokes. The fast tier
+handles the majority of tasks flawlessly **when the brief is precise**; brief
+quality is your job. And expensive solves are capex, not opex: the tier-decay
+loop amortizes each high-tier solution across every future occurrence of its
+class.

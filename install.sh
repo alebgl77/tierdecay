@@ -101,6 +101,8 @@ seed_state() {
   # Ship the full protocol so signature discipline + integrity invariants
   # travel with non-native adapters (they reference .tierdecay/PROTOCOL.md).
   copy_safe "$SRC/core/SPEC.md" "$DEST/.tierdecay/PROTOCOL.md"
+  # Ship the tier->model bindings: the one file to edit when a model ships.
+  copy_safe "$SRC/core/MODELS.md" "$DEST/.tierdecay/MODELS.md"
 }
 
 detect() {
@@ -159,6 +161,10 @@ case "$TARGET" in
     # and silently destroy the learned state.
     [ "$DRY_RUN" = 1 ] || mkdir -p "$DEST/.claude"
     copy_tree "$SRC/adapters/claude-code/.claude" "$DEST/.claude"
+    # The tier->model bindings live at the same path for every adapter, so
+    # CLAUDE.md can reference .tierdecay/MODELS.md unconditionally.
+    [ "$DRY_RUN" = 1 ] || mkdir -p "$DEST/.tierdecay"
+    copy_safe "$SRC/core/MODELS.md" "$DEST/.tierdecay/MODELS.md"
     say "installed .claude/ (agents, skills, hooks, settings, ledger — existing files preserved)"
     ;;
   agents)
