@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning][semver].
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-03
+
+### Changed
+
+- The native Claude Code policy now uses four roles with two aliases: `opus`
+  for the orchestrator, oracle, and heavy executor; `sonnet` for the executor
+  and read-only scout. Current docs and structural regression checks match.
+- Installer, routing, guard, and model-policy regressions run on Ubuntu,
+  macOS, and Windows (Git Bash). A stable `Release readiness` job requires
+  every CI dependency to succeed, including the existing install matrix.
+- Native installation and upgrade instructions now cover `.tierdecay/MODELS.md`,
+  review and merge of sidecars, preservation of learned state and hardened
+  permissions, and a manual active-hook smoke check after reloading agents.
+
+### Fixed
+
+- Uninstall preserves an owned file when its recorded source is missing and
+  relinquishes the selected target's ownership instead of aborting cleanup.
+- Bash guard blocks literal `.claude.` / `.tierdecay.` references that can
+  resolve to protected directories through Win32; other trailing-dot/space
+  variants are blocked conservatively by the lexical check.
+- The guard suite invokes a native Windows helper to verify the single-dot
+  alias. Broader dots/spaces are lexical regressions, not claimed native
+  normalization coverage. Platform skips are explicit; no live Claude Code
+  integration is claimed.
+
 ## [0.2.0] - 2026-09-03
 
 ### Added
@@ -175,6 +201,7 @@ Initial public release.
 
 [keepachangelog]: https://keepachangelog.com/en/1.1.0/
 [semver]: https://semver.org/spec/v2.0.0.html
-[unreleased]: https://github.com/alebgl77/tierdecay/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/alebgl77/tierdecay/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/alebgl77/tierdecay/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/alebgl77/tierdecay/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/alebgl77/tierdecay/releases/tag/v0.1.0

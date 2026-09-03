@@ -189,18 +189,23 @@ cd your-project        # the repo you want to equip — NOT the tierdecay checko
 # preview without writing: /path/to/tierdecay-<version>/install.sh --dry-run <target>
 ```
 
-No bash at all? Every adapter is plain markdown — copy the files from
-`adapters/<your-cli>/` to your repo root by hand and you have the same result.
+Prefer the installer: an adapter-directory copy alone is incomplete. Manual
+installs must also copy `core/MODELS.md` to `.tierdecay/MODELS.md`; non-native
+adapters additionally need `core/SPEC.md` as `.tierdecay/PROTOCOL.md` and the
+ledger/playbook templates as `.tierdecay/ledger.md` and `.tierdecay/playbook.md`.
+Merge with existing files without overwriting learned state or permissions.
+See the [native install and upgrade guide](adapters/claude-code/README.md).
 
 <details>
 <summary><b>Claude Code</b> (native — full 4-agent pipeline)</summary>
 
 Copies `CLAUDE.md` + `.claude/` (4 subagents, 4 skills, the state-write guard
-hook, ledger) to your repo root. Tiers bind through the `opus` / `sonnet` /
-`haiku` aliases — **no special plan access required**, and a new model release
-is picked up automatically. The playbook is **preloaded** into both executors
-via the `skills:` frontmatter. See [`adapters/claude-code/`](adapters/claude-code/)
-and [`core/MODELS.md`](core/MODELS.md) for the optional frontier-tier upgrade.
+hook, ledger) to your repo root, plus `.tierdecay/MODELS.md`. Four roles use
+two aliases: `opus` for the main thread, oracle, and heavy executor; `sonnet`
+for the executor and scout. Check model access in your client. The playbook is
+**preloaded** into both executors via the `skills:` frontmatter. See
+[`adapters/claude-code/`](adapters/claude-code/)
+and [`core/MODELS.md`](core/MODELS.md) for the current policy.
 </details>
 
 <details>
@@ -264,9 +269,9 @@ what makes the posterior converge — the SPEC covers it.
 **Can the cheap model corrupt the system?** Defense in depth, not an
 impossibility claim. The protocol makes state orchestrator-only and VERIFY
 rejects executor diffs touching it; the Claude Code adapter also enforces it
-at the tool layer — executors carry a `PreToolUse` guard hook that blocks any
-call referencing the state paths, and the shipped `settings.json` asks before
-built-in file-edit tools touch those directories. Dynamically constructed Bash
+at the tool layer — executors carry a `PreToolUse` guard hook that checks target
+paths and observable shell references, and the shipped `settings.json` asks
+before built-in file-edit tools touch those directories. Dynamically constructed Bash
 paths remain outside that permission rule and the hook's literal matching, so
 everything an executor runs is still judged against acceptance criteria it
 didn't author. Residual risk and threat model: [SECURITY.md](SECURITY.md).

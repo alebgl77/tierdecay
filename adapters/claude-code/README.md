@@ -35,16 +35,40 @@ Prerequisite: `node` must be available on `PATH`. The Claude adapter uses it to
 parse and canonicalize `PreToolUse` payloads; no npm package is required. The
 guard fails closed when Node.js is unavailable.
 
-1. Copy `CLAUDE.md` and the `.claude/` directory to your repo root (merge with
-   any existing config).
-2. **No special access needed** — the default binds only models available on any
-   paid Claude Code plan (`opus` / `sonnet` / `haiku`). Check yours with `/model`.
+1. Prefer `/path/to/tierdecay/install.sh claude` from the repo you want to equip.
+   For a manual install, copy this adapter's `CLAUDE.md` and `.claude/` directory
+   to your repo root, then copy `core/MODELS.md` from the TierDecay checkout to
+   `.tierdecay/MODELS.md` (create `.tierdecay/` if needed). **Merge existing
+   files deliberately; do not overwrite learned state or hardened settings.**
+2. Four roles use two aliases: `opus` for the main thread, oracle, and heavy
+   executor; `sonnet` for the executor and scout. Check access and the resolved
+   model with your client's model controls; no plan availability is promised.
 3. Start `claude`: the main thread runs the top tier via `.claude/settings.json`
    (`"model": "opus"`). Per-session override: `/model opus`.
-   Have access to a model above Opus? See the optional frontier-tier upgrade in
-   [`core/MODELS.md`](../../core/MODELS.md) — two lines, fully optional.
-4. Enable extended thinking in the session (Tab); in current Claude Code
-   versions subagents inherit the main conversation's thinking configuration.
+4. Configure thinking in your client as appropriate and verify that the agents
+   and their hooks are loaded using the checks below.
+
+### Upgrade from v0.2.0 to v0.2.1
+
+1. Download and verify the tagged release as described in the
+   [root README](../../README.md#quick-start), then run its installer with the
+   `claude` target from your project. Reinstallation does not automatically
+   update existing files: differing incoming files become `*.tierdecay` sidecars.
+2. Review and merge each generated sidecar with its destination, including the
+   guard, agent definitions, settings, and `.tierdecay/MODELS.md`. Keep your
+   learned `.claude/routing-ledger.md` and playbook PATTERNS/QUARANTINE entries;
+   merge only the needed template metadata in `.claude/skills/repo-playbook/SKILL.md`.
+   Preserve hardened permissions and any project-specific hooks in
+   `.claude/settings.json`. Do not replace them wholesale with the defaults.
+   Existing pending sidecars are preserved too; resolve them before retrying.
+3. Reload the Claude session and project agents so the merged definitions are
+   active. Run the integrity-hook smoke check under **Verify** in a disposable
+   project with the same merged configuration. It must block the attempted
+   state write; static tests alone do not establish that your client loaded it.
+
+Uninstall preserves learned state. If an owned artifact's recorded source is
+missing, it also preserves that installed file and relinquishes only the
+selected target's ownership; removal is not inferred from a missing source.
 
 ## State-write enforcement
 
@@ -52,9 +76,10 @@ SPEC §5's "only the orchestrator writes state" is enforced in the tool layer
 here, not just in the prompt:
 
 - `executor` and `heavy-executor` carry a `PreToolUse` hook
-  (`.claude/hooks/tierdecay-guard.sh`) that blocks any of their
-  Write/Edit/Bash calls referencing `.claude/` or `.tierdecay/` — prompt
-  injection included. For Bash, this is defense in depth over observable path
+  (`.claude/hooks/tierdecay-guard.sh`) that blocks their
+  Write/Edit/MultiEdit/NotebookEdit calls when target paths point into
+  `.claude/` or `.tierdecay/`, and blocks observable Bash references to those
+  directories. For Bash, this is defense in depth over path
   literals, not a shell interpreter: a command that constructs the protected
   name without any literal can evade the hook. VERIFY must therefore reject
   executor state diffs regardless of the hook result. `scout` and `oracle` are
@@ -70,16 +95,21 @@ Note: per-agent `hooks` frontmatter applies to project agents like these;
 Claude Code ignores it for agents loaded from plugins.
 
 ## Verify
+
+- Repository suites check payload behavior and registration structure, not a
+  live Claude Code session. Platform/capability skips are reported explicitly;
+  a skipped fixture is not evidence that the corresponding behavior passed.
 - `/agents` should list: scout, executor, heavy-executor, oracle.
 - **Skills preload wired?** Dispatch to `executor`: "quote the first line of the
   PATTERNS section of your playbook." A blank/"no such section" answer means the
   `skills:` frontmatter isn't taking effect on your Claude Code version — the
   distillation half of the loop is dark; pin the entry into the brief until it is.
 - **Integrity hook active?** Dispatch to `executor`: "append `# test` to
-  `.claude/routing-ledger.md`." It must be blocked by the `PreToolUse` guard
-  (`.claude/hooks/tierdecay-guard.sh`). If the write goes through, your build
-  doesn't honor per-agent `hooks:` — fall back to VERIFY-level enforcement
-  (the `settings.json` `ask` rules still gate state writes).
+  `.claude/routing-ledger.md`." Use a disposable project. It must be blocked by
+  the `PreToolUse` guard (`.claude/hooks/tierdecay-guard.sh`). If the write goes through, your build
+  has not demonstrated active per-agent `hooks:` enforcement: stop, review the
+  loaded configuration, and keep VERIFY mandatory. The `settings.json` `ask`
+  rules are a separate layer, not a substitute for this smoke check.
 - Ask for a multi-step feature. Expected behavior: scout recon → plan with
   [T1]/[T2]/[T3] tags → dispatch → verification → oracle review on critical
   diffs.
@@ -89,16 +119,13 @@ Claude Code ignores it for agents loaded from plugins.
   ALL subagents onto one model and destroys the tiering.
 
 ## Tuning
-- Scout runs on the `haiku` alias for cheap recon (same pattern as the built-in
-  Explore agent). If recon reports feel shallow, bump it to `sonnet`.
-- **Aliases are the point.** `fable`, `opus`, `sonnet`, and `haiku` resolve to
-  the latest model in each family at session start, so a new release needs no
-  edit here. Current bindings and pinning guidance live in one file:
+- Scout and executor use `sonnet`; the main thread, oracle, and heavy executor
+  use `opus`. Keep this two-alias policy consistent across settings and agents.
+- **Aliases are the point.** `opus` and `sonnet` avoid pinning a provider version
+  in every agent. Check the model resolved by your client at session start.
+  Current bindings and pinning guidance live in one file:
   [`core/MODELS.md`](../../core/MODELS.md) (installed as `.tierdecay/MODELS.md`).
   Pin an exact ID only for reproducibility — a pin freezes that tier.
-- Want the orchestrator to plan on a bigger model than it executes with? Set
-  `settings.json` to `opusplan` — Claude Code plans on the top tier and drops to
-  the fast tier to execute.
 - The `skills:` field in executor frontmatter preloads `execution-standards`
   into their context at startup — edit that one file to change the discipline
   of both executors at once.

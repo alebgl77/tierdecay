@@ -20,6 +20,49 @@ run_install() {
   (cd "$project" && bash "$INSTALLER" "$@") >/dev/null
 }
 
+new_distribution() {
+  local distribution="$TMP_ROOT/distribution-$1"
+  mkdir -p "$distribution"
+  cp "$INSTALLER" "$distribution/install.sh"
+  cp -R "$ROOT/adapters" "$ROOT/core" "$distribution/"
+  printf '%s\n' "$distribution"
+}
+
+run_distribution() {
+  local distribution="$1" project="$2"
+  shift 2
+  (cd "$project" && bash "$distribution/install.sh" "$@") >/dev/null
+}
+
+# Minimal source fixtures keep adversarial mutations out of the real checkout.
+source_fixture() {
+  distribution="$TMP_ROOT/source-$1"
+  project="$(new_project "source-$1")"
+  source="$distribution/adapters/claude-code/.claude/agents/scout.md"
+  mkdir -p "${source%/*}" "$project/.tierdecay" "$project/.claude/agents"
+  cp "$INSTALLER" "$distribution/install.sh"
+  cp "$ROOT/adapters/claude-code/.claude/agents/scout.md" "$source"
+  printf '%s\n' 'user source sentinel' > "$project/.claude/agents/scout.md"
+  {
+    printf '%s\n' '# tierdecay install manifest v1'
+    printf 'claude\t.claude/agents/scout.md\tadapters/claude-code/.claude/agents/scout.md\n'
+  } > "$project/.tierdecay/install-manifest.tsv"
+}
+
+assert_source_rejected() {
+  local label="$1"
+  cp "$project/.tierdecay/install-manifest.tsv" "$project/manifest.before"
+  if run_distribution "$distribution" "$project" --uninstall claude 2>/dev/null; then
+    printf 'FAIL: %s unexpectedly succeeded\n' "$label" >&2
+    exit 1
+  fi
+  assert_content 'user source sentinel' "$project/.claude/agents/scout.md"
+  cmp -s "$project/manifest.before" "$project/.tierdecay/install-manifest.tsv"
+  assert_missing "$project/.tierdecay/install.lock"
+  [ -z "$(find "$project" -name '.tierdecay-uninstall.*' -print -quit)" ] \
+    || { printf 'FAIL: %s quarantined a file\n' "$label" >&2; exit 1; }
+}
+
 assert_exists() {
   [ -e "$1" ] || { printf 'FAIL: expected %s to exist\n' "$1" >&2; exit 1; }
 }
@@ -86,7 +129,18 @@ ok "an edited sidecar is preserved"
 
 project="$(new_project scoped-target)"
 run_install "$project" agents
-run_install "$project" claude
+run_install "$project" claude || {
+  printf 'FAIL: native distribution installation failed; every managed file needs an explicit manifest allowlist entry\n' >&2
+  exit 1
+}
+while IFS= read -r -d '' native_file; do
+  native_rel="${native_file#"$ROOT/adapters/claude-code/"}"
+  case "$native_rel" in .claude/routing-ledger.md|.claude/skills/repo-playbook/SKILL.md) continue ;; esac
+  native_entry="$(printf 'claude\t%s\tadapters/claude-code/%s' "$native_rel" "$native_rel")"
+  grep -Fqx "$native_entry" "$project/.tierdecay/install-manifest.tsv" \
+    || { printf 'FAIL: native distribution file is missing explicit manifest authorization: %s\n' "$native_rel" >&2; exit 1; }
+done < <(find "$ROOT/adapters/claude-code/.claude" -type f -print0)
+ok "every current managed native distribution file has explicit manifest authorization"
 assert_exists "$project/AGENTS.md"
 assert_exists "$project/CLAUDE.md"
 run_install "$project" --uninstall claude
@@ -116,6 +170,101 @@ run_install "$project" agents
 cmp -s "$project/manifest.before" "$project/.tierdecay/install-manifest.tsv"
 cmp -s "$ROOT/adapters/agents-md/AGENTS.md" "$project/AGENTS.md"
 ok "reinstallation is idempotent"
+
+distribution="$(new_distribution missing-source)"
+project="$(new_project missing-source)"
+run_distribution "$distribution" "$project" claude
+run_distribution "$distribution" "$project" agents
+printf '%s\n' 'user sentinel' > "$project/.claude/sentinel"
+printf '%s\n' 'learned ledger' > "$project/.tierdecay/ledger.md"
+printf '%s\n' 'learned routing' > "$project/.claude/routing-ledger.md"
+printf '%s\n' 'learned Claude playbook' > "$project/.claude/skills/repo-playbook/SKILL.md"
+mv "$distribution/adapters/claude-code/.claude/agents/scout.md" "$distribution/scout.retired"
+cp "$project/.tierdecay/install-manifest.tsv" "$project/manifest.before"
+(cd "$project" && bash "$distribution/install.sh" --dry-run --uninstall claude) > "$project/dry-run.log"
+grep -q 'source for .*scout.md is unavailable' "$project/dry-run.log"
+cmp -s "$project/manifest.before" "$project/.tierdecay/install-manifest.tsv"
+cmp -s "$distribution/scout.retired" "$project/.claude/agents/scout.md"
+ok "dry-run preserves ownership and artifacts when an authorized source is missing"
+
+run_distribution "$distribution" "$project" claude
+run_distribution "$distribution" "$project" agents
+cmp -s "$project/manifest.before" "$project/.tierdecay/install-manifest.tsv"
+run_distribution "$distribution" "$project" --uninstall agents
+assert_missing "$project/AGENTS.md"
+grep -q $'^claude\t.claude/agents/scout.md\t' "$project/.tierdecay/install-manifest.tsv"
+ok "a retired native source does not block reinstall or another target's uninstall"
+
+(cd "$project" && bash "$distribution/install.sh" --uninstall claude) > "$project/uninstall.log"
+grep -q 'source for .*scout.md is unavailable.*preserving it and relinquishing ownership' "$project/uninstall.log"
+cmp -s "$distribution/scout.retired" "$project/.claude/agents/scout.md"
+assert_missing "$project/.claude/agents/executor.md"
+assert_missing "$project/CLAUDE.md"
+assert_content '# tierdecay install manifest v1' "$project/.tierdecay/install-manifest.tsv"
+assert_content 'user sentinel' "$project/.claude/sentinel"
+assert_content 'learned ledger' "$project/.tierdecay/ledger.md"
+assert_content 'learned routing' "$project/.claude/routing-ledger.md"
+assert_content 'learned Claude playbook' "$project/.claude/skills/repo-playbook/SKILL.md"
+ok "missing-source uninstall preserves the artifact and learned state while relinquishing selected ownership"
+
+distribution="$(new_distribution missing-source-parent)"
+project="$(new_project missing-source-parent)"
+run_distribution "$distribution" "$project" claude
+mv "$distribution/adapters/claude-code/.claude/agents" "$distribution/retired-agents"
+run_distribution "$distribution" "$project" claude
+run_distribution "$distribution" "$project" --uninstall claude
+for retired_agent in "$distribution/retired-agents/"*; do
+  cmp -s "$retired_agent" "$project/.claude/agents/${retired_agent##*/}"
+done
+assert_content '# tierdecay install manifest v1' "$project/.tierdecay/install-manifest.tsv"
+ok "missing source parent directories are legitimate absence without authorizing removal"
+
+for availability in absent existing; do
+  source_fixture "invented-$availability"
+  if [ "$availability" = existing ]; then
+    cp "$source" "${source%/*}/invented.md"
+  fi
+  printf '%s\n' 'invented mapping sentinel' > "$project/.claude/agents/invented.md"
+  {
+    printf '%s\n' '# tierdecay install manifest v1'
+    printf 'claude\t.claude/agents/invented.md\tadapters/claude-code/.claude/agents/invented.md\n'
+  } > "$project/.tierdecay/install-manifest.tsv"
+  assert_source_rejected "invented $availability source mapping"
+  assert_content 'invented mapping sentinel' "$project/.claude/agents/invented.md"
+  ok "an invented $availability native source is not authorized by a forged manifest"
+done
+
+source_fixture directory-leaf
+mv "$source" "$distribution/scout.retired"
+mkdir "$source"
+assert_source_rejected 'non-regular source leaf'
+ok "an existing source directory is rejected instead of treated as missing"
+
+source_fixture non-directory-parent
+mv "${source%/*}" "$distribution/retired-agents"
+printf '%s\n' 'not a source directory' > "${source%/*}"
+assert_source_rejected 'non-directory source parent'
+ok "an existing non-directory source parent fails closed"
+
+for component in leaf parent; do
+  for availability in existing absent; do
+    source_fixture "symlink-$component-$availability"
+    if [ "$component" = leaf ]; then
+      source_link="$source"
+    else
+      source_link="${source%/*}"
+    fi
+    mv "$source_link" "$distribution/retired-component"
+    link_target="$distribution/retired-component"
+    [ "$availability" = existing ] || link_target="$distribution/absent-component"
+    if ln -s "$link_target" "$source_link" 2>/dev/null && [ -L "$source_link" ]; then
+      assert_source_rejected "$availability symlinked source $component"
+      ok "an $availability symlinked source $component fails closed"
+    else
+      ok "$availability source-$component symlink guard skipped where symlinks are unavailable"
+    fi
+  done
+done
 
 project="$(new_project auto-target)"
 run_install "$project" agents

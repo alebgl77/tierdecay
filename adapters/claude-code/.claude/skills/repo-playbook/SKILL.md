@@ -1,6 +1,6 @@
 ---
 name: repo-playbook
-description: Repo-specific execution patterns distilled from higher-tier (Opus/Fable) solutions via the tier-decay protocol. Preloaded into executor and heavy-executor at startup. Written ONLY by the main thread — executors read, apply, and report; they never edit this file.
+description: Repo-specific execution patterns distilled from higher-tier solutions via the tier-decay protocol. Preloaded into executor and heavy-executor at startup. Written ONLY by the main thread — executors read, apply, and report; they never edit this file.
 ---
 
 # Repo Playbook (auto-distilled)

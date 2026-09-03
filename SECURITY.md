@@ -39,6 +39,10 @@ and writes `*.tierdecay` sidecars rather than clobbering existing files, but
 it is still a script that touches your filesystem. Read it before running it,
 run it from the repo you intend to equip, and review the diff it produces.
 Bugs in its path handling, overwrite guards, or detection logic are in scope.
+Uninstall never removes learned state. If an owned artifact's recorded source
+is missing, uninstall preserves the installed file and relinquishes the
+selected target's ownership rather than treating the missing source as proof
+that deletion is safe. Review any preserved files yourself.
 
 **2. The instruction files themselves.** This is the interesting surface. The
 adapters and the compiled playbook steer an autonomous coding agent, so a
@@ -99,6 +103,16 @@ precise about which layer you are relying on:
 
 A bypass of layer 2, or a shipped default that weakens it, is a security bug
 and in scope.
+
+Repository regression suites exercise guard payloads and native Windows paths;
+the model-policy test checks aliases and hook registration/frontmatter shape.
+These are not live Claude Code integration tests. Platform- or
+capability-dependent fixture skips are reported explicitly, and security
+failures must not be suppressed. After an upgrade, review and merge sidecars
+without dropping learned state or hardened permissions, reload the session and
+agents, and run the active-hook smoke check in the
+[native adapter guide](adapters/claude-code/README.md#verify) using a disposable
+project. A passing structural check cannot prove a client's hook is active.
 
 Out of scope: the behavior of the underlying coding CLIs and models
 themselves, and anything a user does after editing the shipped files

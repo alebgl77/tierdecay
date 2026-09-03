@@ -128,6 +128,23 @@ run_without_node() {
   fi
 }
 
+run_windows_alias_case() {
+  local actual
+
+  if node "$repo_root/tests/test-guard-windows.js" "$guard" "$BASH" "$temp_root"; then
+    actual=0
+  else
+    actual=$?
+  fi
+
+  if [ "$actual" -eq 77 ]; then
+    skips=$((skips + 1))
+  elif [ "$actual" -ne 0 ]; then
+    printf 'not ok - literal Win32 alias integration (exit %s)\n' "$actual"
+    failures=$((failures + 1))
+  fi
+}
+
 # The payload must contain a literal shell variable for the guard to inspect.
 # shellcheck disable=SC2016
 bash_variable_payload='{"tool_name":"Bash","tool_input":{"command":"d=.tierdecay; cat \"$d/playbook.md\""}}'
@@ -143,6 +160,16 @@ deny_cases=(
   'Windows trailing dot alias|{"tool_name":"Write","tool_input":{"file_path":"C:\\repo\\.tierdecay.\\playbook.md"}}'
   'Bash direct reference|{"tool_name":"Bash","tool_input":{"command":"cat .tierdecay/playbook.md"}}'
   'Bash escaped Unicode reference|{"tool_name":"Bash","tool_input":{"command":"cat .claude\u002fsettings.json"}}'
+  'Bash Claude trailing dot|{"tool_name":"Bash","tool_input":{"command":"cat .claude./routing-ledger.md"}}'
+  'Bash TierDecay trailing dot|{"tool_name":"Bash","tool_input":{"command":"cat .tierdecay./playbook.md"}}'
+  'Bash Claude multiple dots|{"tool_name":"Bash","tool_input":{"command":"cat C:\\repo\\.claude...\\routing-ledger.md"}}'
+  'Bash TierDecay multiple dots|{"tool_name":"Bash","tool_input":{"command":"cat C:\\repo\\.tierdecay...\\playbook.md"}}'
+  'Bash Claude trailing space|{"tool_name":"Bash","tool_input":{"command":"cat \".claude /routing-ledger.md\""}}'
+  'Bash TierDecay trailing space|{"tool_name":"Bash","tool_input":{"command":"cat \".tierdecay /playbook.md\""}}'
+  'Bash Claude mixed suffix|{"tool_name":"Bash","tool_input":{"command":"cat \".ClAuDe. ./routing-ledger.md\""}}'
+  'Bash TierDecay mixed suffix|{"tool_name":"Bash","tool_input":{"command":"cat \".TiErDeCaY. ./playbook.md\""}}'
+  'Bash Claude dots at token end|{"tool_name":"Bash","tool_input":{"command":"stat .claude..."}}'
+  'Bash TierDecay dots at token end|{"tool_name":"Bash","tool_input":{"command":"stat .tierdecay..."}}'
   "Bash simple variable|$bash_variable_payload"
   'malformed JSON|{"tool_name":"Write"'
   'mutation without target|{"tool_name":"Write","tool_input":{"content":"x"}}'
@@ -154,6 +181,14 @@ allow_cases=(
   'ordinary source read|{"tool_name":"Bash","tool_input":{"command":"cat src/app.py"}}'
   'ordinary lint|{"tool_name":"Bash","tool_input":{"command":"npm run lint"}}'
   'similar non-state path|{"tool_name":"Write","tool_input":{"file_path":"docs/.tierdecay-example.md","content":"x"}}'
+  'Bash Claude backup directory|{"tool_name":"Bash","tool_input":{"command":"cat .claude-backup/notes.md"}}'
+  'Bash TierDecay backup directory|{"tool_name":"Bash","tool_input":{"command":"cat .tierdecay-backup/notes.md"}}'
+  'Bash Claude longer name|{"tool_name":"Bash","tool_input":{"command":"cat .claudex/notes.md"}}'
+  'Bash TierDecay longer name|{"tool_name":"Bash","tool_input":{"command":"cat .tierdecayx/notes.md"}}'
+  'Bash Claude dot extension|{"tool_name":"Bash","tool_input":{"command":"cat .claude...backup/notes.md"}}'
+  'Bash TierDecay dot extension|{"tool_name":"Bash","tool_input":{"command":"cat .tierdecay...backup/notes.md"}}'
+  'Bash state substring|{"tool_name":"Bash","tool_input":{"command":"cat project.claude./notes.md project.tierdecay./notes.md"}}'
+  'file-tool alias content mention|{"tool_name":"Write","tool_input":{"file_path":"README.md","content":"Document .claude./ and .tierdecay.../ here"}}'
   'normalized path outside state|{"tool_name":"Write","tool_input":{"file_path":".tierdecay/../README.md","content":"x"}}'
 )
 
@@ -170,6 +205,7 @@ run_from_nested_cwd
 run_symlink_case
 run_symlink_parent_case
 run_external_symlink_case
+run_windows_alias_case
 
 if [ "$failures" -ne 0 ]; then
   printf '%s guard test(s) failed\n' "$failures" >&2
@@ -177,4 +213,4 @@ if [ "$failures" -ne 0 ]; then
 fi
 
 printf 'all %s guard checks completed (%s skipped)\n' \
-  "$(( ${#deny_cases[@]} + ${#allow_cases[@]} + 5 ))" "$skips"
+  "$(( ${#deny_cases[@]} + ${#allow_cases[@]} + 6 ))" "$skips"
