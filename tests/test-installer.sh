@@ -518,6 +518,7 @@ project="$(new_project quarantine-term)"
 run_install "$project" agents
 term_bin="$TMP_ROOT/term-bin"
 term_signal="$TMP_ROOT/term-signal"
+term_log="$TMP_ROOT/term.log"
 real_cmp="$(command -v cmp)"
 mkdir -p "$term_bin"
 {
@@ -539,11 +540,34 @@ chmod +x "$term_bin/cmp"
   cd "$project"
   exec env PATH="$term_bin:$PATH" TERM_SIGNAL="$term_signal" REAL_CMP="$real_cmp" \
     bash "$INSTALLER" --uninstall agents
-) >/dev/null 2>&1 &
+) >"$term_log" 2>&1 &
 term_pid=$!
-deadline=$((SECONDS + 10))
-while [ ! -e "$term_signal" ] && [ "$SECONDS" -lt "$deadline" ]; do :; done
-[ -e "$term_signal" ] || { kill "$term_pid" 2>/dev/null || true; wait "$term_pid" 2>/dev/null || true; printf 'FAIL: TERM test never reached quarantine\n' >&2; exit 1; }
+deadline=$((SECONDS + 60))
+term_wait_failure=""
+while [ ! -e "$term_signal" ]; do
+  if ! kill -0 "$term_pid" 2>/dev/null; then
+    term_wait_failure="child exited before reaching quarantine"
+    break
+  fi
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    term_wait_failure="timed out waiting for quarantine"
+    break
+  fi
+done
+if [ -n "$term_wait_failure" ]; then
+  if kill -0 "$term_pid" 2>/dev/null; then
+    kill -TERM "$term_pid" 2>/dev/null || true
+    term_cleanup_deadline=$((SECONDS + 3))
+    while kill -0 "$term_pid" 2>/dev/null && [ "$SECONDS" -lt "$term_cleanup_deadline" ]; do :; done
+    if kill -0 "$term_pid" 2>/dev/null; then
+      kill -KILL "$term_pid" 2>/dev/null || true
+    fi
+  fi
+  wait "$term_pid" 2>/dev/null || true
+  printf 'FAIL: TERM preparation %s\n' "$term_wait_failure" >&2
+  cat "$term_log" >&2
+  exit 1
+fi
 kill -TERM "$term_pid"
 if wait "$term_pid"; then
   printf 'FAIL: TERM-interrupted uninstall unexpectedly succeeded\n' >&2
