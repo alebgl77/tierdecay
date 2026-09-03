@@ -11,8 +11,8 @@ abstract: >-
 authors:
   - family-names: "Beguel"
     given-names: "Alexandre"
-version: 0.1.0
-date-released: "2026-07-12"
+version: 0.2.0
+date-released: "2026-09-03"
 license: MIT
 repository-code: "https://github.com/alebgl77/tierdecay"
 url: "https://github.com/alebgl77/tierdecay"

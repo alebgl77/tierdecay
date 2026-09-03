@@ -35,10 +35,11 @@ match.
 1. **RECON** — read-only. Map relevant files, symbols, conventions, risks in
    ≤400 words. No edits, no opinions.
 2. **PLAN** — route every task BEFORE touching code:
-   - class listed in `.tierdecay/ledger.md` PRIORS → use its empirical
+   - class has a live entry in `.tierdecay/playbook.md` (not quarantined,
+     floor not reached) → PROBE one tier below the entry's provenance, entry
+     quoted in your working notes; a live entry outranks PRIORS;
+   - else class listed in `.tierdecay/ledger.md` PRIORS → use its empirical
      default tier, skip scoring;
-   - class has a live entry in `.tierdecay/playbook.md` → PROBE one tier
-     below the entry's provenance, entry quoted in your working notes;
    - otherwise score: ambiguity(0–2) + depth(0–3) + blast-radius(0–2) +
      risk(0–3) → 0–3 = T1 · 4–6 = T2 · ≥7 or any axis maxed = T3.
 3. **EXECUTE** — smallest diff satisfying explicit ACCEPTANCE criteria

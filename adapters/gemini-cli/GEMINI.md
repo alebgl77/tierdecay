@@ -13,8 +13,8 @@ playbook hits (fewer turns, tighter context).
 
 ## Phases (constraints are binding)
 1. **RECON** — read-only mapping, ≤400 words: files, symbols, conventions, risks.
-2. **PLAN** — route BEFORE coding: ledger PRIORS → empirical tier; live
-   playbook entry → PROBE one tier below provenance; else score
+2. **PLAN** — route BEFORE coding: live playbook entry → PROBE one tier below
+   provenance; else ledger PRIORS → empirical tier; otherwise score
    ambiguity(0–2)+depth(0–3)+blast(0–2)+risk(0–3): 0–3=T1 · 4–6=T2 · ≥7 or any axis maxed=T3.
 3. **EXECUTE** — smallest diff meeting explicit ACCEPTANCE criteria; mirror
    repo conventions; BLOCKED note instead of scope creep.

@@ -1,6 +1,12 @@
 name: CI
 
 on:
+  workflow_call:
+    inputs:
+      checkout_ref:
+        description: Exact commit to validate
+        required: false
+        type: string
   push:
     branches: [main]
   pull_request:
@@ -13,10 +19,23 @@ jobs:
     name: Shellcheck & repo structure
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7 # pin to a SHA once Dependabot proposes it
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
 
       - name: Shellcheck all shell
-        run: shellcheck install.sh adapters/claude-code/.claude/hooks/*.sh
+        run: |
+          set -euo pipefail
+          mapfile -d '' scripts < <(find . -type f -name '*.sh' -not -path './.git/*' -print0)
+          [ "${#scripts[@]}" -gt 0 ] || { echo "::error::no shell scripts found"; exit 1; }
+          shellcheck "${scripts[@]}"
+
+      - name: Run regression test suites
+        run: |
+          set -euo pipefail
+          bash tests/test-installer.sh
+          bash tests/test-routing-order.sh
+          bash tests/test-guard.sh
 
       - name: Required files present
         run: |
@@ -119,7 +138,9 @@ jobs:
     name: Protocol conformance
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7 # pin to a SHA once Dependabot proposes it
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
 
       - name: Context files under the 120-line cap
         run: |
@@ -186,7 +207,9 @@ jobs:
     name: Docs integrity (offline)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7 # pin to a SHA once Dependabot proposes it
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
 
       - name: Mermaid fences are balanced
         run: |
@@ -222,7 +245,9 @@ jobs:
         target: [claude, agents, cursor, gemini, aider, cline, goose, windsurf]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7 # pin to a SHA once Dependabot proposes it
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
 
       - name: Install, then re-run to prove idempotence (no clobber)
         run: |

@@ -6,37 +6,94 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  ci:
+    name: Validate tagged commit
+    uses: ./.github/workflows/ci.yml
+    with:
+      checkout_ref: ${{ github.sha }}
+    permissions:
+      contents: read
+
   release:
     name: Publish GitHub Release
+    needs: ci
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v7 # pin to a SHA once Dependabot proposes it
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Validate tag and main ancestry
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          [[ "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] \
+            || { echo "::error::tag '$tag' is not strict SemVer (expected vMAJOR.MINOR.PATCH)"; exit 1; }
+          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+          tag_commit="$(git rev-parse "${tag}^{commit}")"
+          head_commit="$(git rev-parse HEAD)"
+          [ "$tag_commit" = "$head_commit" ] \
+            || { echo "::error::checked-out commit is not the commit referenced by $tag"; exit 1; }
+          git merge-base --is-ancestor "$tag_commit" origin/main \
+            || { echo "::error::$tag does not point to a commit on origin/main"; exit 1; }
+          echo "$tag points to the validated commit on origin/main."
 
       - name: Guard tag <-> CHANGELOG <-> CITATION.cff coherence
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME#v}"
-          grep -qE "^## \[${tag}\]" CHANGELOG.md \
+          prefix="## [${tag}] - "
+          if ! release_line="$(awk -v wanted="$prefix" '
+            index($0, wanted) == 1 {count++; line=$0}
+            END {if (count == 1) print line; else exit 1}
+          ' CHANGELOG.md)"; then
+            release_line=""
+          fi
+          changelog_pattern='^## \[([0-9]+\.[0-9]+\.[0-9]+)\] - ([0-9]{4}-[0-9]{2}-[0-9]{2})$'
+          [[ "$release_line" =~ $changelog_pattern ]] \
             || { echo "::error::CHANGELOG.md has no section for ${tag}"; exit 1; }
-          grep -qE "^version: *${tag}\$" CITATION.cff \
+          changelog_version="${BASH_REMATCH[1]}"
+          release_date="${BASH_REMATCH[2]}"
+          citation_version="$(awk -F ':' '$1 == "version" {
+            value=$2; gsub(/["[:space:]]/, "", value); print value
+          }' CITATION.cff)"
+          citation_date="$(awk -F ':' '$1 == "date-released" {
+            value=$2; gsub(/["[:space:]]/, "", value); print value
+          }' CITATION.cff)"
+          installer_version="$(sed -n 's/^VERSION="\([^"]*\)"$/\1/p' install.sh)"
+          [ "$changelog_version" = "$tag" ] \
+            || { echo "::error::CHANGELOG.md version != ${tag}"; exit 1; }
+          [ "$citation_version" = "$tag" ] \
             || { echo "::error::CITATION.cff version != ${tag}"; exit 1; }
-          grep -qE "^VERSION=\"${tag}\"\$" install.sh \
+          [ "$installer_version" = "$tag" ] \
             || { echo "::error::install.sh VERSION != ${tag} (update the constant)"; exit 1; }
-          echo "Tag ${tag} matches CHANGELOG, CITATION.cff, and install.sh."
+          [ "$citation_date" = "$release_date" ] \
+            || { echo "::error::CITATION.cff date-released != ${release_date}"; exit 1; }
+          echo "Tag ${tag} and date ${release_date} match CHANGELOG, CITATION.cff, and install.sh."
 
       - name: Extract release notes from CHANGELOG
         id: notes
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME#v}"
-          awk -v v="$tag" '
-            $0 ~ "^## \\[" v "\\]" {grab=1; next}
-            grab && /^## \[/ {exit}
+          release_date="$(awk -F ':' '$1 == "date-released" {
+            value=$2; gsub(/["[:space:]]/, "", value); print value
+          }' CITATION.cff)"
+          header="## [${tag}] - ${release_date}"
+          awk -v header="$header" '
+            $0 == header {grab=1; next}
+            grab && index($0, "## [") == 1 {exit}
             grab {print}
+            END {if (!grab) exit 1}
           ' CHANGELOG.md > RELEASE_NOTES.md
+          [ -s RELEASE_NOTES.md ] \
+            || { echo "::error::release notes for ${tag} are empty"; exit 1; }
           echo "wrote $(wc -l < RELEASE_NOTES.md) lines of notes"
 
       - name: Build verifiable archive + SHA256SUMS
@@ -52,13 +109,31 @@ jobs:
           sha256sum --check SHA256SUMS
           cat SHA256SUMS
 
-      - name: Create the GitHub Release
+      - name: Create draft release with verified assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           ver="${GITHUB_REF_NAME#v}"
           gh release create "${GITHUB_REF_NAME}" \
+            --draft \
+            --verify-tag \
             --title "${GITHUB_REF_NAME}" \
             --notes-file RELEASE_NOTES.md \
             "tierdecay-${ver}.tar.gz" SHA256SUMS
+
+      - name: Verify assets and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF_NAME#v}"
+          is_draft="$(gh release view "${GITHUB_REF_NAME}" --json isDraft --jq '.isDraft')"
+          [ "$is_draft" = true ] \
+            || { echo "::error::release left draft state before asset verification"; exit 1; }
+          assets="$(gh release view "${GITHUB_REF_NAME}" --json assets --jq '.assets[].name')"
+          grep -Fxq "tierdecay-${ver}.tar.gz" <<< "$assets" \
+            || { echo "::error::release archive is missing"; exit 1; }
+          grep -Fxq 'SHA256SUMS' <<< "$assets" \
+            || { echo "::error::SHA256SUMS is missing"; exit 1; }
+          gh release edit "${GITHUB_REF_NAME}" --draft=false

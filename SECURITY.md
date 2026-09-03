@@ -4,10 +4,12 @@
 
 | Version | Supported |
 |---|---|
-| latest `main` | yes |
+| latest tagged release | yes |
+| `main` / unreleased | no |
 
-TierDecay ships as source. Only the current `main` is supported; pull the
-latest before reporting.
+Only the latest tagged release is supported and recommended for production.
+`main` contains unreleased development work; use it for evaluation and
+contribution, not production deployment.
 
 ## Reporting a vulnerability
 
@@ -23,9 +25,12 @@ there.
 ## Scope & threat model
 
 TierDecay is markdown instruction files plus a Bash `install.sh` that copies
-those files into your repository. There is no network service, no runtime
+those files into your repository. There is no network service or runtime
 daemon, no telemetry, and no secret handling — so the usual server-side and
-credential surfaces do not apply here. Two surfaces are real and in scope:
+credential surfaces do not apply here. The Claude Code adapter's local guard
+hook requires Node.js to parse tool payloads; it is the only adapter-specific
+runtime requirement and does not run as a service. Three surfaces are real and
+in scope:
 
 **1. `install.sh` file operations.** The installer runs in your shell with
 your permissions and writes into your working tree (`CLAUDE.md`, `AGENTS.md`,
@@ -56,8 +61,9 @@ makes two indirect attacks realistic:
   project. Install from a **tagged release** of this repository, not from an
   arbitrary clone of `main` or a fork: releases from this repo carry a
   `SHA256SUMS` asset — verify the archive against it before running
-  `install.sh` (`sha256sum -c SHA256SUMS`). Read `install.sh` and the adapter
-  you install; they are short on purpose.
+  `install.sh` (`sha256sum -c SHA256SUMS` on Linux or
+  `shasum -a 256 -c SHA256SUMS` on macOS). Read `install.sh` and the adapter you
+  install; they are short on purpose.
 - *Shared repositories.* If you **commit** `.tierdecay/` (or the Claude Code
   adapter's ledger/playbook under `.claude/`), you share learned state with
   your team — and anyone with write access to the repo can steer every
@@ -78,12 +84,15 @@ precise about which layer you are relying on:
    model follows — strong in practice, but the same class of mechanism as a
    prompt injection, so it must not be your only layer.
 2. **Technical (Claude Code adapter):** `executor` and `heavy-executor` carry
-   a `PreToolUse` guard hook (`.claude/hooks/tierdecay-guard.sh`) that blocks,
-   at the tool layer, any of their calls referencing `.claude/` or
-   `.tierdecay/`; the shipped `settings.json` additionally `ask`-gates every
-   remaining state write — including the orchestrator's own DISTILL — behind
-   explicit human approval. A prompt-injected agent cannot silently write the
-   ledger or playbook.
+   a defense-in-depth `PreToolUse` guard hook
+   (`.claude/hooks/tierdecay-guard.sh`). It canonicalizes structured target
+   paths and blocks observable shell references to `.claude/` or
+   `.tierdecay/`; the shipped `settings.json` additionally `ask`-gates state
+   writes behind explicit human approval. This is not a security boundary:
+   dynamic Bash that constructs a target without a literal state-path
+   reference, and TOCTOU changes between inspection and execution, cannot be
+   ruled out. VERIFY therefore remains mandatory. For a strong guarantee,
+   remove Bash from executor tools or enforce OS-level filesystem isolation.
 3. **Human:** review state diffs like code (see above), and treat an
    unexpected prompt to approve a state write as a red flag — that prompt IS
    the alarm going off.

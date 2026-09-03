@@ -31,6 +31,10 @@ Anti-poisoning defenses (the failure mode of any self-modifying system):
   demonstrated failure.
 
 ## Install
+Prerequisite: `node` must be available on `PATH`. The Claude adapter uses it to
+parse and canonicalize `PreToolUse` payloads; no npm package is required. The
+guard fails closed when Node.js is unavailable.
+
 1. Copy `CLAUDE.md` and the `.claude/` directory to your repo root (merge with
    any existing config).
 2. **No special access needed** — the default binds only models available on any
@@ -50,12 +54,17 @@ here, not just in the prompt:
 - `executor` and `heavy-executor` carry a `PreToolUse` hook
   (`.claude/hooks/tierdecay-guard.sh`) that blocks any of their
   Write/Edit/Bash calls referencing `.claude/` or `.tierdecay/` — prompt
-  injection included. `scout` and `oracle` are read-only by tool grant.
+  injection included. For Bash, this is defense in depth over observable path
+  literals, not a shell interpreter: a command that constructs the protected
+  name without any literal can evade the hook. VERIFY must therefore reject
+  executor state diffs regardless of the hook result. `scout` and `oracle` are
+  read-only by tool grant.
 - `settings.json` `ask`-gates `Edit(.claude/**)` and `Edit(.tierdecay/**)`:
-  every surviving state write — including the orchestrator's own DISTILL —
-  asks for your approval. One click per task close; an unexpected approval
-  prompt is your injection alarm. Prefer protocol-only enforcement? Remove
-  the `ask` rules — but then the invariants rest on the prompt alone.
+  built-in file edits matching those paths — including the orchestrator's own
+  DISTILL — ask for your approval. This rule does not sandbox Bash; dynamically
+  constructed commands remain subject to VERIFY. An unexpected approval prompt
+  is your injection alarm. Prefer protocol-only enforcement? Remove the `ask`
+  rules — but then the invariants rest on the prompt alone.
 
 Note: per-agent `hooks` frontmatter applies to project agents like these;
 Claude Code ignores it for agents loaded from plugins.

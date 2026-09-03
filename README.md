@@ -67,10 +67,10 @@ The router literally learns your repo's difficulty distribution.
 
 ```mermaid
 flowchart TD
-    A([New task]) --> B{Class in<br/>ledger PRIORS?}
-    B -- yes --> C[Use empirical default tier<br/><i>skip scoring entirely</i>]
-    B -- no --> D{Live playbook<br/>entry?}
-    D -- yes --> E[PROBE: one tier below provenance<br/>entry quoted in the brief]
+    A([New task]) --> B{Live playbook<br/>entry?}
+    B -- yes --> E[PROBE: one tier below provenance<br/>entry quoted in the brief]
+    B -- no --> D{Class in<br/>ledger PRIORS?}
+    D -- yes --> C[Use empirical default tier<br/><i>skip scoring entirely</i>]
     D -- no --> F[Score the 4-axis rubric<br/>ambiguity · depth · blast radius · risk]
     F --> G{Sum}
     G -- "0–3" --> T1[T1 — cheap executor]
@@ -92,7 +92,7 @@ sequenceDiagram
     participant L as Ledger + Playbook
     O->>S: recon mission
     S-->>O: recon report (≤400 words)
-    O->>L: pre-check PRIORS & playbook
+    O->>L: pre-check live playbook, then PRIORS
     O->>E: self-contained brief<br/>(objective · files · acceptance)
     E-->>O: diff + report + PLAYBOOK feedback
     O->>R: critical diff? REVIEW
@@ -156,18 +156,37 @@ self-poisoning. TierDecay ships with the antibodies:
 
 ## Quick start
 
-**Prerequisites:** one of the supported CLIs, and `bash` to run the installer —
-already present on macOS and Linux; on **Windows** use Git Bash or WSL. No
-runtime, no package manager, no API key. Nothing is installed globally: the
-installer only copies files into the repo you point it at.
+For production, use only the
+[latest tagged release](https://github.com/alebgl77/tierdecay/releases/latest).
+`main` is unreleased development and is intended for evaluation and
+contribution, not production use. Download both `tierdecay-<version>.tar.gz`
+and `SHA256SUMS` from the release into the same directory, then verify the
+archive before extracting or running its installer:
 
 ```bash
-git clone https://github.com/alebgl77/tierdecay
+# Linux
+sha256sum --check SHA256SUMS
+# macOS
+shasum -a 256 -c SHA256SUMS
+tar -xzf tierdecay-<version>.tar.gz
+```
+
+Proceed only when the checksum command reports `OK`. Replace `<version>` below
+with the release version you downloaded.
+
+**Prerequisites:** one of the supported CLIs, and `bash` to run the installer —
+already present on macOS and Linux; on **Windows** use Git Bash or WSL. No
+service runtime, package manager, or API key is required. The Claude Code
+adapter alone requires `node` for its local state-write guard hook; the other
+adapters do not. Nothing is installed globally: the installer only copies
+files into the repo you point it at.
+
+```bash
 cd your-project        # the repo you want to equip — NOT the tierdecay checkout
-../tierdecay/install.sh auto
+/path/to/tierdecay-<version>/install.sh auto
 # or pick one explicitly:
-../tierdecay/install.sh <claude|agents|cursor|gemini|aider|cline|goose|windsurf>
-# preview without writing: ../tierdecay/install.sh --dry-run <target>
+/path/to/tierdecay-<version>/install.sh <claude|agents|cursor|gemini|aider|cline|goose|windsurf>
+# preview without writing: /path/to/tierdecay-<version>/install.sh --dry-run <target>
 ```
 
 No bash at all? Every adapter is plain markdown — copy the files from
@@ -246,10 +265,11 @@ what makes the posterior converge — the SPEC covers it.
 impossibility claim. The protocol makes state orchestrator-only and VERIFY
 rejects executor diffs touching it; the Claude Code adapter also enforces it
 at the tool layer — executors carry a `PreToolUse` guard hook that blocks any
-call referencing the state paths, and the shipped `settings.json` `ask`-gates
-every remaining state write behind your approval. Everything an executor runs
-is still judged against acceptance criteria it didn't author. Residual risk
-and threat model: [SECURITY.md](SECURITY.md).
+call referencing the state paths, and the shipped `settings.json` asks before
+built-in file-edit tools touch those directories. Dynamically constructed Bash
+paths remain outside that permission rule and the hook's literal matching, so
+everything an executor runs is still judged against acceptance criteria it
+didn't author. Residual risk and threat model: [SECURITY.md](SECURITY.md).
 
 **Is this fine-tuning?** No weights change. It's *in-context distillation*:
 expensive reasoning compiled into instructions a cheaper model can follow.

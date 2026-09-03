@@ -35,10 +35,11 @@ the protocol still pays via playbook hits (fewer turns, tighter context).
 1. **RECON** — Plan mode, read-only. Map files, symbols, conventions, risks in
    ≤400 words. No edits, no opinions.
 2. **PLAN** — still Plan mode. Route every task BEFORE Act:
-   - class in `.tierdecay/ledger.md` PRIORS → use its empirical default tier,
-     skip scoring;
-   - live entry in `.tierdecay/playbook.md` → PROBE one tier below the entry's
-     provenance, entry quoted in your notes;
+   - live entry in `.tierdecay/playbook.md` (not quarantined, floor not
+     reached) → PROBE one tier below the entry's provenance, entry quoted in
+     your notes; a live entry outranks PRIORS;
+   - else class in `.tierdecay/ledger.md` PRIORS → use its empirical default
+     tier, skip scoring;
    - else score ambiguity(0–2) + depth(0–3) + blast(0–2) + risk(0–3):
      0–3 = T1 · 4–6 = T2 · ≥7 or any axis maxed = T3.
    Announce the tier the task deserves; switch to Act only once routed.
