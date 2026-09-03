@@ -34,6 +34,8 @@ fi
 
 # This adapter requires Node (documented in its README). Parsing here avoids
 # treating JSON escape sequences as inert text and keeps path checks portable.
+# The embedded Node program must remain literal for Node to interpret it.
+# shellcheck disable=SC2016
 exec node -e '
 const path = require("path");
 const fs = require("fs");

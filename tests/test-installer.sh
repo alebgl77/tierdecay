@@ -375,10 +375,14 @@ mkdir -p "$term_bin"
   printf '%s\n' '#!/usr/bin/env bash'
   printf '%s\n' 'case " $* " in'
   printf '%s\n' "  *'.tierdecay-uninstall.'*)"
+  # Generated script expands TERM_SIGNAL when it runs.
+  # shellcheck disable=SC2016
   printf '%s\n' '    : > "$TERM_SIGNAL"'
   printf '%s\n' '    sleep 2'
   printf '%s\n' '    ;;'
   printf '%s\n' 'esac'
+  # Generated script expands REAL_CMP and its arguments when it runs.
+  # shellcheck disable=SC2016
   printf '%s\n' 'exec "$REAL_CMP" "$@"'
 } > "$term_bin/cmp"
 chmod +x "$term_bin/cmp"
@@ -425,10 +429,14 @@ mkdir -p "$race_bin"
   printf '%s\n' '#!/usr/bin/env bash'
   printf '%s\n' 'case " $* " in'
   printf '%s\n' "  *'.tierdecay-uninstall.'*)"
+  # Generated script expands RACE_SIGNAL when it runs.
+  # shellcheck disable=SC2016
   printf '%s\n' '    : > "$RACE_SIGNAL"'
   printf '%s\n' '    sleep 1'
   printf '%s\n' '    ;;'
   printf '%s\n' 'esac'
+  # Generated script expands REAL_CMP and its arguments when it runs.
+  # shellcheck disable=SC2016
   printf '%s\n' 'exec "$REAL_CMP" "$@"'
 } > "$race_bin/cmp"
 chmod +x "$race_bin/cmp"

@@ -128,6 +128,10 @@ run_without_node() {
   fi
 }
 
+# The payload must contain a literal shell variable for the guard to inspect.
+# shellcheck disable=SC2016
+bash_variable_payload='{"tool_name":"Bash","tool_input":{"command":"d=.tierdecay; cat \"$d/playbook.md\""}}'
+
 deny_cases=(
   'direct file path|{"tool_name":"Write","tool_input":{"file_path":".tierdecay/playbook.md","content":"x"}}'
   'escaped slash|{"tool_name":"Edit","tool_input":{"file_path":".tierdecay\/playbook.md"}}'
@@ -139,7 +143,7 @@ deny_cases=(
   'Windows trailing dot alias|{"tool_name":"Write","tool_input":{"file_path":"C:\\repo\\.tierdecay.\\playbook.md"}}'
   'Bash direct reference|{"tool_name":"Bash","tool_input":{"command":"cat .tierdecay/playbook.md"}}'
   'Bash escaped Unicode reference|{"tool_name":"Bash","tool_input":{"command":"cat .claude\u002fsettings.json"}}'
-  'Bash simple variable|{"tool_name":"Bash","tool_input":{"command":"d=.tierdecay; cat \"$d/playbook.md\""}}'
+  "Bash simple variable|$bash_variable_payload"
   'malformed JSON|{"tool_name":"Write"'
   'mutation without target|{"tool_name":"Write","tool_input":{"content":"x"}}'
 )

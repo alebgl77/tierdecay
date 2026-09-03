@@ -70,8 +70,9 @@ TARGET="${1:-auto}"
 
 # --- ownership manifest ----------------------------------------------------
 valid_rel_path() { # valid_rel_path <relative-path>
+  local backslash=$'\\'
   [ -n "$1" ] || return 1
-  [[ "$1" != *'\'* ]] || return 1
+  case "$1" in *"$backslash"*) return 1 ;; esac
   case "$1" in
     /*|.|..|../*|*/..|*/../*|*$'\t'*|*$'\r'*|*$'\n'*) return 1 ;;
   esac
@@ -116,7 +117,7 @@ assert_safe_destination() { # assert_safe_destination <absolute-path>
 release_lock() {
   local staged
   [ "$LOCK_HELD" = 1 ] || return 0
-  for staged in "${LOCK_FILES[@]}"; do
+  for staged in ${LOCK_FILES[@]+"${LOCK_FILES[@]}"}; do
     if [ -e "$staged" ] || [ -L "$staged" ]; then rm -f "$staged" 2>/dev/null || true; fi
   done
   if ! rmdir "$LOCK_DIR" 2>/dev/null; then
@@ -157,7 +158,9 @@ new_lock_stage() { # sets STAGED to a unique path under the held lock
   [ "$LOCK_HELD" = 1 ] || die "internal error: manifest mutation without installer lock"
   STAGE_SEQ=$((STAGE_SEQ + 1))
   STAGED="$LOCK_DIR/stage-$STAGE_SEQ"
-  [ ! -e "$STAGED" ] && [ ! -L "$STAGED" ] || die "unexpected installer staging collision: $STAGED"
+  if [ -e "$STAGED" ] || [ -L "$STAGED" ]; then
+    die "unexpected installer staging collision: $STAGED"
+  fi
   LOCK_FILES+=("$STAGED")
 }
 
@@ -215,7 +218,9 @@ manifest_mapping_allowed() { # manifest_mapping_allowed <owner> <dest-rel> <sour
 validate_manifest() {
   local line first=1 line_number=0
   [ ! -L "$DEST/.tierdecay" ] || die "state directory is symlinked — leaving all files untouched"
-  [ -f "$MANIFEST" ] && [ ! -L "$MANIFEST" ] || die "ownership manifest is missing or symlinked — leaving all files untouched"
+  if [ ! -f "$MANIFEST" ] || [ -L "$MANIFEST" ]; then
+    die "ownership manifest is missing or symlinked — leaving all files untouched"
+  fi
   while IFS= read -r line || [ -n "$line" ]; do
     line_number=$((line_number + 1))
     if [ "$first" = 1 ]; then
@@ -254,7 +259,9 @@ manifest_record() { # manifest_record <source> <destination>
   local src_rel dest_rel line
   case "$1" in "$SRC"/*) src_rel="${1#"$SRC"/}" ;; *) die "source is outside TierDecay checkout: $1" ;; esac
   case "$2" in "$DEST"/*) dest_rel="${2#"$DEST"/}" ;; *) die "destination is outside project: $2" ;; esac
-  valid_rel_path "$src_rel" && valid_rel_path "$dest_rel" || die "refusing unsafe manifest path"
+  if ! valid_rel_path "$src_rel" || ! valid_rel_path "$dest_rel"; then
+    die "refusing unsafe manifest path"
+  fi
   is_preserved_state "$dest_rel" && return
   manifest_mapping_allowed "$TARGET" "$dest_rel" "$src_rel" \
     || die "internal error: refusing unauthorized ownership mapping for $dest_rel"
