@@ -1,73 +1,49 @@
 # Model Bindings — the only file that names a model version
 
 Tiers are **roles**, not models. Every adapter, skill, and agent in this repo
-binds T0–T3 by role and by **provider alias**; this file is the single place
-where roles map to concrete, named models. A new model release is therefore a
-one-file edit here — not a sweep across the tree.
+binds T0–T3 by role and by **provider alias**; this file records the current
+binding policy and any deliberately pinned model IDs. Current bindings do not
+depend on a provider version number, price, or plan-availability claim.
 
 CI enforces this: a versioned model string (`Opus 4.8`, `claude-sonnet-4-6`, …)
 appearing anywhere outside this file, the changelog, or a historical ledger
 fails the `conformance` job.
 
-## Default bindings — work on any paid Claude Code plan (updated 2026-07-24)
+## Default bindings — four roles, two aliases (updated 2026-09-03)
 
-The shipped adapter uses only models available to every paid plan, so a fresh
-install runs out of the box. T3 and T2 share the `opus` alias: the tiers stay
-distinct as **roles** (T3 specs and reviews, T2 implements) even where the model
-is the same.
+The native adapter uses only `opus` and `sonnet`. T3 and T2 share `opus`; T1
+and T0 share `sonnet`. The roles stay distinct even where the model is the
+same: planning/review, complex execution, standard execution, and read-only
+recon. Check access and the resolved model in your client when starting a
+session; this policy does not promise availability on any particular plan.
 
-| Tier | Role | Claude Code alias | Concrete model today |
-|---|---|---|---|
-| T3 | plan, architect, review critical diffs | `opus` | Claude Opus 5 |
-| T2 | strong workhorse: refactors, concurrency, perf | `opus` | Claude Opus 5 |
-| T1 | fast/cheap: specced features, tests, docs | `sonnet` | Claude Sonnet 5 |
-| T0 | cheapest: read-only recon | `haiku` | Claude Haiku 4.5 |
-
-### Optional upgrade: a distinct frontier tier
-
-If your plan or org has access to a model above Opus, bind T3 to it and the four
-tiers become four distinct models. Two edits, both in the installed `.claude/`:
-
-```jsonc
-// .claude/settings.json  — the orchestrator (main thread)
-{ "model": "fable" }
-```
-```yaml
-# .claude/agents/oracle.md frontmatter — the reviewer
-model: fable
-```
-
-Everything else is unchanged: `heavy-executor` stays `opus`, `executor` stays
-`sonnet`, `scout` stays `haiku`. If the alias is not available to your account,
-Claude Code will tell you at session start — revert those two edits and you are
-back on the universal default.
+| Tier | Role | Claude Code alias |
+|---|---|---|
+| T3 | main thread / oracle: plan, architect, review critical diffs | `opus` |
+| T2 | heavy executor: refactors, concurrency, perf | `opus` |
+| T1 | executor: specced features, tests, docs | `sonnet` |
+| T0 | scout: read-only recon | `sonnet` |
 
 ## Prefer aliases over pinned IDs
 
-Claude Code's `model:` aliases (`fable`, `opus`, `sonnet`, `haiku`) resolve to
-the **latest model in each family at session start**. That is the whole
-mechanism: when a new Opus ships, an agent bound to `opus` picks it up with no
-edit anywhere. The adapters use aliases for exactly this reason.
+The shipped `model:` fields request `opus` or `sonnet`, not a versioned ID.
+Alias resolution belongs to the client/provider, so model-family updates do
+not require rewriting the agent files. Verify the resolved model when a
+session starts and record it when comparing results.
 
 Pin an exact ID only when you need reproducibility — a benchmark, a regression
-you are bisecting, or a ledger you intend to compare across weeks:
-
-```yaml
-model: claude-opus-5   # pinned; will NOT track future releases
-```
+you are bisecting, or a ledger you intend to compare across weeks.
 
 A pin is a deliberate cost: it freezes that tier until someone updates it. Note
 the pin in your ledger so the row stays interpretable later.
 
 ## When a new model ships
 
-1. Update the table above (one row, plus the date).
-2. Nothing else — aliases already point at it. Skills, agents, and adapter prose
-   name roles, not versions, so they need no edit.
-3. If the new model changes a tier's *economics* (e.g. the mid tier becomes as
-   cheap as the fast tier), reconsider which alias each tier binds to — that is
-   a routing decision, and it belongs in the table above too.
-4. Re-run your probes. A model change invalidates the empirical posterior: a
+1. Check the model actually resolved by your client; do not infer it from a
+   release announcement or an alias name alone.
+2. Keep the two-alias policy unless you deliberately revise it. Skills, agents,
+   and adapter prose name roles, not versions, so they need no version edit.
+3. Re-run your probes. A model change invalidates the empirical posterior: a
    class that decayed to T1 under the old fast model may or may not hold under
    the new one. Treat a tier rebinding like a playbook revision — the next
    occurrence of each decayed class is a fresh probe, not a settled default.

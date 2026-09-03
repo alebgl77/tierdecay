@@ -28,7 +28,8 @@ An adapter is one folder under `adapters/` containing:
 1. the CLI's native context file implementing `core/SPEC.md` (phases or
    agents — pick what the CLI supports),
 2. a README: install line + model-binding table,
-3. an `install.sh` case (one `cp`/`copy_safe` block that seeds state).
+3. an `install.sh` target case and matching preflight plan, ownership/source
+   allowlist, and state-seeding behavior.
 
 Folder layout (follow the existing adapters, e.g. `adapters/aider/`):
 
@@ -49,9 +50,22 @@ switch between:
 | T1 | standard execution | your fast/cheap model |
 | T0 | read-only recon | your cheapest model |
 
-Add a `case` arm in `install.sh` that copies the context file and calls
-`seed_state` (native adapters may lay down their own state dir instead). Then
-test it: run `install.sh <target>` into a throwaway repo and confirm the two
+Keep `install.sh` target cases, preflight plans, and the ownership/source
+allowlist in sync. Copy the context file, seed state (`seed_state` for
+non-native adapters), and include the companion protocol/model files. The
+native allowlist must retain these nine known or historical non-state
+artifacts so old ownership records remain safe to process:
+
+- `.claude/hooks/tierdecay-guard.sh` and `.claude/settings.json`;
+- `.claude/agents/{scout,executor,heavy-executor,oracle}.md`;
+- `.claude/skills/{execution-standards,model-routing,tier-decay}/SKILL.md`.
+
+The learned ledger and repo-playbook are state, not uninstallable artifacts.
+If a recorded source disappears, uninstall must preserve the installed file
+while relinquishing the selected target's ownership. Add regressions when
+changing these inventories or collision/ownership behavior.
+
+Then test it: run `install.sh <target>` into a throwaway repo and confirm the two
 state files seed — `.tierdecay/ledger.md` and `.tierdecay/playbook.md` for
 non-native adapters, or the adapter's own state dir for native ones. The first
 high-tier solve should have somewhere to write its first ledger row.
@@ -68,20 +82,38 @@ high-tier solve should have somewhere to write its first ledger row.
 
 ## Testing your change
 
-No test harness — verification is manual and takes a minute:
+Run the repository's regression suites from its root (Bash and Node.js required):
 
-- `shellcheck install.sh` — the installer is Bash; keep it clean.
-- Install into a scratch repo and confirm files land:
+```bash
+bash tests/test-installer.sh
+bash tests/test-routing-order.sh
+bash tests/test-guard.sh
+node tests/test-model-policy.js
+shellcheck install.sh tests/*.sh adapters/claude-code/.claude/hooks/tierdecay-guard.sh
+```
+
+CI runs the suites on Ubuntu, macOS, and Windows with Git Bash. The guard
+suite invokes `tests/test-guard-windows.js` automatically on Windows; it is
+not a separate CI entrypoint. Read any `SKIP` output: platform- or
+capability-dependent skipped checks are not passes. Guard/security failures
+must never be suppressed. The model-policy test checks aliases and hook
+registration/frontmatter structure; it does not launch Claude or prove that a
+live client loaded the hooks. Use the native adapter's manual smoke check for
+that additional check. Ubuntu CI also runs ShellCheck and protocol/docs checks.
+
+- Install into a scratch repo and confirm files land (Cursor example):
 
   ```bash
-  mkdir /tmp/td-scratch && cd /tmp/td-scratch
-  /path/to/tierdecay/install.sh <claude|agents|gemini|aider|cline|goose|windsurf>
+  scratch="$(mktemp -d)"
+  cd "$scratch"
+  /path/to/tierdecay/install.sh cursor
   ls -R .            # context file present; state files seeded
   ```
 
 - Re-run the installer in the same dir — existing files must be preserved
   (`copy_safe` writes `<file>.tierdecay` instead of clobbering).
-- If you touched a context file, eyeball its line count against the ~120 cap.
+- `tests/test-routing-order.sh` checks live playbook → PRIORS → rubric order
+  and the 120-line cap for every native context file.
 
 ## Commit & PR
 

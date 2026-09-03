@@ -30,13 +30,6 @@ jobs:
           [ "${#scripts[@]}" -gt 0 ] || { echo "::error::no shell scripts found"; exit 1; }
           shellcheck "${scripts[@]}"
 
-      - name: Run regression test suites
-        run: |
-          set -euo pipefail
-          bash tests/test-installer.sh
-          bash tests/test-routing-order.sh
-          bash tests/test-guard.sh
-
       - name: Required files present
         run: |
           set -euo pipefail
@@ -92,7 +85,7 @@ jobs:
             || { echo "::error::expected a .tierdecay sidecar on collision"; exit 1; }
           # A reinstall must also never replace a user's hardened settings.json
           # (e.g. permissions/hooks) with the shipped default.
-          printf '{"model":"fable","permissions":{"deny":["WebFetch"]}}\n' > "$tmp/.claude/settings.json"
+          printf '{"model":"opus","permissions":{"deny":["WebFetch"]}}\n' > "$tmp/.claude/settings.json"
           (cd "$tmp" && "$GITHUB_WORKSPACE/install.sh" claude)
           grep -q '"deny"' "$tmp/.claude/settings.json" \
             || { echo "::error::reinstall clobbered a hardened .claude/settings.json"; exit 1; }
@@ -133,6 +126,27 @@ jobs:
           echo '{"tool_name":"Write","tool_input":{"file_path":"README.md","content":"state lives in .tierdecay/ledger.md"}}' | "$g" \
             || { echo "::error::guard blocked a legitimate docs write (content-only mention)"; exit 1; }
           echo "Enforcement intact: guard blocks state writes (file + Bash), passes normal and content-only-mention writes."
+
+  regressions:
+    name: Regression suites on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
+
+      - name: Run regression test suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tests/test-installer.sh
+          bash tests/test-routing-order.sh
+          bash tests/test-guard.sh
+          node tests/test-model-policy.js
 
   conformance:
     name: Protocol conformance
@@ -281,3 +295,21 @@ jobs:
             || { echo "::error::$t: re-install CLOBBERED learned state ($state)"; exit 1; }
 
           echo "$t: install + idempotent re-install OK on ${{ matrix.os }}."
+
+  release-readiness:
+    name: Release readiness
+    needs: [lint, conformance, docs, install-matrix, regressions]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every CI job to succeed
+        shell: bash
+        env:
+          NEEDS_RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          [ -n "$NEEDS_RESULTS" ] || { echo "::error::no CI results available"; exit 1; }
+          for result in $NEEDS_RESULTS; do
+            [ "$result" = success ] || { echo "::error::required CI job result: $result"; exit 1; }
+          done
+          echo "All required CI jobs succeeded."

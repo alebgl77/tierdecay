@@ -8,14 +8,15 @@ file exploration — subagents exist for that.
 
 Tiers are roles. Each agent binds its tier with a Claude Code **alias**, which
 resolves to the latest model in that family — so a new release needs no edit
-here. Concrete model names and pinning guidance: `.tierdecay/MODELS.md`.
+here. Four roles use only `opus` and `sonnet`; binding policy and pinning
+guidance: `.tierdecay/MODELS.md`.
 
 | Tier | Alias    | Agent                   | Job |
 |------|----------|-------------------------|-----|
 | T3   | `opus`   | main thread + `oracle`  | Planning, architecture, novel algorithms, root-causing resistant bugs, review of critical diffs |
 | T2   | `opus`   | `heavy-executor`        | Complex execution: multi-file refactors, concurrency, migrations, perf, subtle correctness |
 | T1   | `sonnet` | `executor`              | Standard execution: specced features, tests, docs, mechanical edits |
-| T0   | `haiku`  | `scout`                 | Read-only recon: map files, symbols, conventions, risks |
+| T0   | `sonnet` | `scout`                 | Read-only recon: map files, symbols, conventions, risks |
 
 ## Protocol — every non-trivial request
 

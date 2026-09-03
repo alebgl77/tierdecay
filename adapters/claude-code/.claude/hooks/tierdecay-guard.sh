@@ -172,7 +172,9 @@ if (tool === "Bash") {
   // observable state-directory identifier is suspect, including assignments
   // such as `d=.tierdecay; cat "$d/playbook.md"`. Dynamically assembled names
   // with no observable state literal remain subject to orchestrator VERIFY.
-  const stateReference = /(^|[^A-Za-z0-9_.-])\.(?:claude|tierdecay)(?=$|[\\/]|[^A-Za-z0-9_.-])/i;
+  // Literal trailing dots/spaces may alias these components in Win32 calls
+  // launched through Bash. Keep the boundary so .claude-backup stays ordinary.
+  const stateReference = /(^|[^A-Za-z0-9_.-])\.(?:claude|tierdecay)[ .]*(?=$|[\\/]|[^A-Za-z0-9_.-])/i;
   if (stateReference.test(command)) deny();
 }
 '

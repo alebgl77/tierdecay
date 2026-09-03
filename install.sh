@@ -5,7 +5,7 @@
 # Bash (not strict POSIX): uses BASH_SOURCE and arrays.
 set -euo pipefail
 
-VERSION="0.2.0"
+VERSION="0.2.1"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 DEST="$(pwd -P)"
 
@@ -193,10 +193,34 @@ canonical_regular_source() { # canonical_regular_source <source-rel>
   case "$physical" in "$SRC"/*) return 0 ;; *) return 1 ;; esac
 }
 
+# An authorized source may have been retired in a newer distribution. Check
+# every existing component without following links, then resolve the deepest
+# existing parent; only genuine absence is allowed, never an unsafe path.
+safe_source_path() { # safe_source_path <source-rel>
+  local rel="$1" source="$SRC/$1" current="$SRC" next part physical
+  local parts=()
+  valid_rel_path "$rel" || return 1
+  case "$rel" in ./*|*/./*|*/.|*//*|*/) return 1 ;; esac
+  [ -d "$SRC" ] && [ ! -L "$SRC" ] || return 1
+  IFS=/ read -r -a parts <<< "$rel"
+  for part in "${parts[@]}"; do
+    next="$current/$part"
+    [ ! -L "$next" ] || return 1
+    [ -e "$next" ] || break
+    if [ "$next" = "$source" ]; then
+      [ -f "$next" ] || return 1
+      break
+    fi
+    [ -d "$next" ] || return 1
+    current="$next"
+  done
+  physical="$(cd -P "$current" 2>/dev/null && printf '%s\n' "$PWD")" || return 1
+  [ "$physical" = "$current" ]
+}
+
 manifest_mapping_allowed() { # manifest_mapping_allowed <owner> <dest-rel> <source-rel>
-  local owner="$1" dest="$2" source="$3" expected="" rel=""
+  local owner="$1" dest="$2" source="$3" expected=""
   is_preserved_state "$dest" && return 1
-  canonical_regular_source "$source" || return 1
   case "$owner:$source" in
     agents:adapters/agents-md/AGENTS.md) expected="AGENTS.md" ;;
     gemini:adapters/gemini-cli/GEMINI.md) expected="GEMINI.md" ;;
@@ -205,10 +229,19 @@ manifest_mapping_allowed() { # manifest_mapping_allowed <owner> <dest-rel> <sour
       expected="AGENTS.md"
       ;;
     claude:adapters/claude-code/CLAUDE.md) expected="CLAUDE.md" ;;
-    claude:adapters/claude-code/.claude/*)
-      rel="${source#adapters/claude-code/.claude/}"
-      [ -n "$rel" ] || return 1
-      expected=".claude/$rel"
+    # Explicit current/historical managed files (v0.2.0 onward). Retain an
+    # entry when retiring its source so old manifests remain usable. Learned
+    # routing/playbook state is deliberately not part of this allowlist.
+    claude:adapters/claude-code/.claude/agents/executor.md|\
+    claude:adapters/claude-code/.claude/agents/heavy-executor.md|\
+    claude:adapters/claude-code/.claude/agents/oracle.md|\
+    claude:adapters/claude-code/.claude/agents/scout.md|\
+    claude:adapters/claude-code/.claude/hooks/tierdecay-guard.sh|\
+    claude:adapters/claude-code/.claude/settings.json|\
+    claude:adapters/claude-code/.claude/skills/execution-standards/SKILL.md|\
+    claude:adapters/claude-code/.claude/skills/model-routing/SKILL.md|\
+    claude:adapters/claude-code/.claude/skills/tier-decay/SKILL.md)
+      expected="${source#adapters/claude-code/}"
       ;;
     *) return 1 ;;
   esac
@@ -232,6 +265,8 @@ validate_manifest() {
     assert_safe_destination "$DEST/$MF_DEST"
     manifest_mapping_allowed "$MF_OWNER" "$MF_DEST" "$MF_SOURCE" \
       || die "ownership manifest has an unauthorized mapping at line $line_number — leaving all files untouched"
+    safe_source_path "$MF_SOURCE" \
+      || die "ownership manifest has an unsafe source at line $line_number — leaving all files untouched"
   done < "$MANIFEST"
   [ "$first" = 0 ] || die "ownership manifest is empty — leaving all files untouched"
 }
@@ -265,6 +300,7 @@ manifest_record() { # manifest_record <source> <destination>
   is_preserved_state "$dest_rel" && return
   manifest_mapping_allowed "$TARGET" "$dest_rel" "$src_rel" \
     || die "internal error: refusing unauthorized ownership mapping for $dest_rel"
+  canonical_regular_source "$src_rel" || die "refusing to record unavailable or unsafe source: $src_rel"
   while IFS= read -r line || [ -n "$line" ]; do
     [ "$line" = "$MANIFEST_HEADER" ] && continue
     parse_manifest_line "$line" || die "ownership manifest changed during installation"
@@ -280,8 +316,10 @@ manifest_record() { # manifest_record <source> <destination>
 
 # --- copy helpers (never clobber; dry-run aware) ---------------------------
 do_cp() { # do_cp <src> <dest> [label]
-  local dir
+  local dir src_rel
   dir="${2%/*}"
+  case "$1" in "$SRC"/*) src_rel="${1#"$SRC"/}" ;; *) die "source is outside TierDecay checkout: $1" ;; esac
+  canonical_regular_source "$src_rel" || die "refusing to copy unavailable or unsafe source: $src_rel"
   assert_safe_destination "$2"
   if [ "$DRY_RUN" = 1 ]; then plan "write ${3:-$2}"; return; fi
   mkdir -p "$dir"
@@ -490,7 +528,8 @@ remove_owned_artifact() { # remove_owned_artifact <path> <source>
     [ ! -e "$path" ] && [ ! -L "$path" ] && return
     die "could not quarantine $path; leaving ownership manifest unchanged"
   fi
-  if [ -f "$QUARANTINED" ] && [ ! -L "$QUARANTINED" ] && cmp -s "$source" "$QUARANTINED"; then
+  if [ -f "$QUARANTINED" ] && [ ! -L "$QUARANTINED" ] \
+    && canonical_regular_source "${source#"$SRC"/}" && cmp -s "$source" "$QUARANTINED"; then
     if rm -f "$QUARANTINED"; then
       rmdir "$QUARANTINE_DIR" 2>/dev/null || true
       ACTIVE_ORIGINAL=""
@@ -533,7 +572,7 @@ uninstall_manifest_target() {
       warn "$path is also owned by another target — preserving it"
     elif [ ! -e "$path" ] && [ ! -L "$path" ]; then
       : # Missing artifact: forget stale ownership.
-    elif [ ! -f "$source" ]; then
+    elif ! canonical_regular_source "${source#"$SRC"/}"; then
       warn "source for $path is unavailable — preserving it and relinquishing ownership"
     elif [ "$DRY_RUN" = 1 ]; then
       if [ ! -L "$path" ] && cmp -s "$source" "$path"; then
