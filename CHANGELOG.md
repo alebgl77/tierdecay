@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning][semver].
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-03
+
 ### Added
 
 - `cline`, `goose`, and `windsurf` adapters — each ships an `AGENTS.md` mapped
@@ -43,17 +45,19 @@ and this project adheres to [Semantic Versioning][semver].
   the changelog, or a historical ledger. This is the mechanism that keeps the
   tree from going stale at the next release; it caught a stale placeholder in
   the bug-report template on its first run.
+- CI is now reusable by the release workflow, runs the installer, routing, and
+  guard regression suites, and Shellchecks every shell script in the tree.
 
 ### Changed
 
 - **Model bindings are now expressed as tiers + provider aliases, never version
   numbers.** Adapters, skills, and agent descriptions name roles (frontier /
-  strong workhorse / fast / cheapest) and bind through the `fable`, `opus`,
-  `sonnet`, `haiku` aliases, which resolve to the latest model in each family at
+  strong workhorse / fast / cheapest) and bind through the `opus`, `sonnet`,
+  and `haiku` aliases, which resolve to the latest model in each family at
   session start — so a new release is picked up with no edit. Current bindings:
-  Claude Fable 5 (T3), Claude Opus 5 (T2), Claude Sonnet 5 (T1), Claude Haiku
-  4.5 (T0). `examples/self-build/` keeps the model names that session actually
-  ran on — it is a historical record, not a live binding.
+  Claude Opus 5 (T3 and T2), Claude Sonnet 5 (T1), and Claude Haiku 4.5 (T0).
+  `examples/self-build/` keeps the model names that session actually ran on —
+  it is a historical record, not a live binding.
 - `install.sh` rewritten around non-destructive `copy_safe`/`copy_tree`
   helpers: one collision policy everywhere (sidecar `*.tierdecay`, pending
   sidecars preserved), no reliance on `cp -n` semantics.
@@ -71,6 +75,10 @@ and this project adheres to [Semantic Versioning][semver].
   BLOCK verdict vocabulary.
 - Cline adapter: T0 recon explicitly assigned to Plan mode (read-only safety
   over model cost), resolving the tier-map contradiction.
+- Release publication now requires the tagged commit to pass the full CI,
+  validates strict SemVer and ancestry from `main`, and remains a draft until
+  its archive and `SHA256SUMS` assets have both been attached and verified.
+- All `actions/checkout` uses are pinned to an immutable commit SHA.
 
 ### Deprecated
 
@@ -167,5 +175,6 @@ Initial public release.
 
 [keepachangelog]: https://keepachangelog.com/en/1.1.0/
 [semver]: https://semver.org/spec/v2.0.0.html
-[unreleased]: https://github.com/alebgl77/tierdecay/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/alebgl77/tierdecay/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/alebgl77/tierdecay/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/alebgl77/tierdecay/releases/tag/v0.1.0

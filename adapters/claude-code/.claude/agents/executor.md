@@ -11,7 +11,7 @@ hooks:
     - matcher: "Write|Edit|MultiEdit|NotebookEdit|Bash"
       hooks:
         - type: command
-          command: ".claude/hooks/tierdecay-guard.sh"
+          command: '"${CLAUDE_PROJECT_DIR}/.claude/hooks/tierdecay-guard.sh"'
 ---
 
 You implement exactly what the brief specifies — nothing more, nothing less.

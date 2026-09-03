@@ -22,10 +22,11 @@ here. Concrete model names and pinning guidance: `.tierdecay/MODELS.md`.
 1. **RECON** — dispatch `scout` first. Never explore the codebase from the main
    thread beyond reading 1–2 files.
 2. **PLAN** — with extended thinking. Decompose into tasks. For each task,
-   check `.claude/routing-ledger.md` FIRST: a class listed in PRIORS uses its
-   empirical default tier and skips scoring; a class with a live
-   `repo-playbook` entry runs a PROBE one tier below provenance (`tier-decay`
-   §3). Only unrecognized classes get scored with the `model-routing` rubric.
+   check `repo-playbook` FIRST: a class with a live entry runs a PROBE one
+   tier below provenance (`tier-decay` §3). Only if no live entry applies,
+   check `.claude/routing-ledger.md`: a class listed in PRIORS uses its
+   empirical default tier and skips scoring. Only unrecognized classes get
+   scored with the `model-routing` rubric.
    Present the plan before executing if scope is large or destructive.
 3. **DISPATCH** — send each task to its tier's agent, naming the agent
    explicitly. Every dispatch uses the self-contained brief format from the
