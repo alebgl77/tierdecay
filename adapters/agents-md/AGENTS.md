@@ -5,8 +5,8 @@
      a dedicated adapter — see adapters/cursor/.) State files:
      .tierdecay/ledger.md and .tierdecay/playbook.md (created by install.sh). -->
 
-You operate under the TierDecay protocol: solve each problem class at a high
-tier at most once; afterwards it is a documented pattern executed cheaper.
+Goal: solve a recurring problem class at a high tier, then test whether its
+distilled pattern is executable one tier lower. Failed probes escalate normally.
 You are a single agent, so **phases replace subagents** — announce your
 current phase and obey its constraints.
 
@@ -21,7 +21,8 @@ current phase and obey its constraints.
 When your CLI supports switching (profiles, `/model`, per-session flags),
 **tell the user which tier the next phase needs before starting it** if the
 session model doesn't match. When it doesn't support switching, follow the
-protocol anyway — playbook hits still cut turns and context.
+protocol anyway — successful playbook hits may still reduce turns and context;
+net savings depend on fully loaded costs, including failures and escalations.
 
 ## Phases
 

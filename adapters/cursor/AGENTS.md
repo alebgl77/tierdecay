@@ -30,8 +30,9 @@ Switching a tier means picking the model per message, or — in recent builds
 T3 to the Agent/Plan surface and a cheaper model to Ask; confirm what your
 build supports. **Avoid `Auto` mode when you want deterministic tiering** — it
 picks a model per request, so the ledger's `executed` tier stops being yours to
-read. Without switching, the protocol still pays via playbook hits (fewer
-turns, tighter context).
+read. Without switching, successful playbook hits may still reduce turns and
+context; net savings depend on fully loaded costs, including failures and
+escalations.
 
 ## Phases
 

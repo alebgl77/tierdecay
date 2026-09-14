@@ -8,8 +8,9 @@ This file mirrors the universal adapter with Gemini-native tier mapping.
 - **T1 / T0** → Flash-class model (execution, recon)
 
 Announce the tier each phase needs; the user switches with `/model` or starts
-the session with `-m`. Without switching, the protocol still pays via
-playbook hits (fewer turns, tighter context).
+the session with `-m`. Without switching, successful playbook hits may still
+reduce turns and context; net savings depend on fully loaded costs, including
+failures and escalations.
 
 ## Phases (constraints are binding)
 1. **RECON** — read-only mapping, ≤400 words: files, symbols, conventions, risks.

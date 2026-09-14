@@ -28,7 +28,8 @@ Enable Settings → **"Use different models for Plan and Act"** and bind:
 
 Switching Plan↔Act auto-swaps the active model and carries history over, so a
 phase transition already moves you to the right tier. When you can't switch,
-the protocol still pays via playbook hits (fewer turns, tighter context).
+successful playbook hits may still reduce turns and context; net savings depend
+on fully loaded costs, including failures and escalations.
 
 ## Phases (constraints are binding)
 

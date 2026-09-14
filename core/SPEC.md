@@ -90,5 +90,5 @@ Phases replace agents: the one agent announces its current phase
 (RECON/PLAN/EXECUTE/VERIFY/DISTILL) and applies that phase's constraints.
 Model tiering happens through whatever the CLI offers — per-session model
 flags, `/model` commands, profiles, or architect/editor splits. Where no
-switching exists, decay still pays through fewer turns and tighter context on
-playbook hits.
+switching exists, successful playbook hits may still reduce turns and context;
+net savings depend on fully loaded costs, including failures and escalations.
