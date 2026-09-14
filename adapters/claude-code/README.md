@@ -17,9 +17,13 @@ The loop:
 4. Symmetric upgrade: two escalations raise a class's default. The rubric is
    the cold-start prior; the ledger is the posterior.
 
-Net effect: the marginal cost of each recurring problem class decays toward
-Sonnet pricing. High-tier solves become capex amortized over every reuse —
-break-even at the first reuse.
+Net effect: for recurring classes whose lower-tier probes pass, marginal cost
+can decay toward Sonnet pricing. High-tier solves can become capex amortized
+over successful reuses. First-reuse break-even is conditional on fully loaded,
+same-unit costs: the one-time cost must satisfy
+`C_distill ≤ C_hi - C_lo`, where `C_lo` is the expected cost of a reuse attempt
+beginning at the low tier, including routing, verification, failed probes, and
+escalations. TierDecay has no published benchmark.
 
 Anti-poisoning defenses (the failure mode of any self-modifying system):
 - Only the main thread writes under `.claude/**`; VERIFY rejects executor

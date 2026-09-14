@@ -20,4 +20,5 @@ AGENTS.md, append this one below it.
 
 Single-agent CLIs run TierDecay in phase mode (see AGENTS.md §Phases): the
 agent announces the tier a phase needs and you switch — or ignore switching
-entirely and still collect the playbook's turn/context savings.
+entirely. Successful playbook hits may still reduce turns and context; net
+savings depend on fully loaded costs, including failures and escalations.

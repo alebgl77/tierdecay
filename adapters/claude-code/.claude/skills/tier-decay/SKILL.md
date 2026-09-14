@@ -5,10 +5,11 @@ description: Post-completion distillation protocol that converts high-tier solut
 
 # Tier Decay — amortize reasoning
 
-Goal: every problem CLASS is solved at a high tier **at most once**. Afterwards
-it exists as a documented pattern executable one tier lower. Expensive tokens
-are capital expenditure; this protocol is the amortization schedule. The
-routing rubric is only the cold-start prior — the ledger is the posterior.
+Goal: solve a recurring problem CLASS at a high tier, then test whether its
+distilled pattern is executable one tier lower. Failed probes escalate normally.
+Expensive tokens are capital expenditure; this protocol is the amortization
+schedule. The routing rubric is only the cold-start prior — the ledger is the
+posterior.
 
 ## 1. Ledger — one row per task, every tier
 
@@ -66,7 +67,11 @@ RAISED one tier in PRIORS. Calibration runs both directions.
 
 ## 6. Economics
 
-Break-even ≈ first reuse: one high-tier-priced solve buys every future
-fast-tier-priced execution of its class. Health check: the `executed` column in
-the LOG should drift toward T1 over time for recurring classes — that drift
-IS the optimization working.
+Break-even is conditional, not guaranteed. With fully loaded costs in the same
+units, first-reuse break-even requires the one-time cost to satisfy
+`C_distill ≤ C_hi - C_lo`, where `C_lo` is the expected cost of a reuse attempt
+beginning at the low tier, including routing, verification, failed probes, and
+escalations. If `C_hi ≤ C_lo`, a nonnegative distillation cost cannot be
+amortized into savings. TierDecay has no published benchmark. Health check: for
+recurring classes whose probes pass, the `executed` column in the LOG should
+drift toward T1 over time — that drift is the intended optimization.

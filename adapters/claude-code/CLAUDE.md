@@ -68,6 +68,6 @@ guidance: `.tierdecay/MODELS.md`.
 Frontier-tier tokens are the scarcest, most expensive resource in this repo.
 Spend them on decisions, specs and reviews — not keystrokes. The fast tier
 handles the majority of tasks flawlessly **when the brief is precise**; brief
-quality is your job. And expensive solves are capex, not opex: the tier-decay
-loop amortizes each high-tier solution across every future occurrence of its
-class.
+quality is your job. Successful lower-tier reuses can amortize high-tier
+reasoning when their cumulative fully loaded savings exceed the one-time
+distillation cost.

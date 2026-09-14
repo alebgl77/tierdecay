@@ -4,9 +4,9 @@
 
 # TierDecay
 
-**The self-distilling model router for AI coding CLIs. It gets cheaper every run.**
+**The self-distilling model router for AI coding CLIs. It learns which recurring classes can move lower after successful probes.**
 
-*Solve each problem class at the expensive tier **once**. Execute it at the cheap tier **forever**.*
+*Solve recurring problem classes at the tier they need. Reuse verified patterns at a lower tier when probes pass.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -34,11 +34,11 @@
 
 ## The problem
 
-Every AI coding CLI forces the same bad trade: burn frontier-model tokens on
-boilerplate, or watch a cheap model faceplant on hard problems. Static routing
-rubrics help — but a rubric scored by your most expensive model, **on every
-task, forever**, is itself the waste. Your router knows nothing about *your*
-repo on task 1, and still knows nothing on task 500.
+Many AI coding workflows face the same bad trade: burn frontier-model tokens
+on boilerplate, or watch a cheap model faceplant on hard problems. Static
+routing rubrics help — but repeatedly routing every task through a high tier
+can add avoidable cost. Your router knows nothing about *your* repo on task 1,
+and still knows nothing on task 500.
 
 ## The idea
 
@@ -116,22 +116,42 @@ stateDiagram-v2
 
 ## The economics
 
-Let `n` = future occurrences of a class, `C_hi` / `C_lo` = per-task cost at
-the high/low tier.
+Let `n ≥ 0` be the number of future reuses after the initial high-tier solve,
+`C_hi ≥ 0` the fully loaded cost of one occurrence routed at the high tier,
+`C_lo ≥ 0` the expected fully loaded cost of one reuse attempt beginning at the
+low tier (including routing, verification, failures, and escalations), and
+`C_distill ≥ 0` the one-time distillation cost after the initial solve. All
+costs must use the same units.
 
 ```
-static routing:   n · C_hi
-tier decay:       C_hi  +  C_distill  +  n · C_lo        (C_distill ≈ a few hundred tokens)
-break-even:       n = 1  — the first reuse pays for the solve
+static routing:   S(n) = (n + 1) · C_hi
+tier decay:       T(n) = C_hi + C_distill + n · C_lo
+cost gap:         Δ = C_hi - C_lo
 ```
 
-Illustrative relative cost per run of one recurring class (plug your
-provider's real prices — then post your ledger, not ours):
+For `Δ > 0`, weak break-even (`T(n) ≤ S(n)`) occurs at
+`n ≥ ceil(C_distill / Δ)`; strict savings (`T(n) < S(n)`) occur at
+`n ≥ floor(C_distill / Δ) + 1`. Equality occurs only when
+`C_distill / Δ` is an integer (at that value of `n`); otherwise the weak
+threshold already yields strict savings. Strict savings are impossible when
+`Δ ≤ 0`. If `Δ < 0`, weak break-even is equality and occurs only at `n = 0`
+when `C_distill = 0`. If `Δ = 0`, equality holds for every `n` when
+`C_distill = 0`; otherwise there is no weak break-even.
 
-| Run | 1 | 2 | 3 | 4 | 5 |
+Illustration only, not benchmark evidence: let `C_hi = 1`, `C_lo = 0.2`, and
+`C_distill = 0.1`, and assume every low-tier probe succeeds without failure or
+escalation cost.
+
+| Occurrence | 1 *(initial)* | 2 *(first reuse)* | 3 | 4 | 5 |
 |---|---|---|---|---|---|
-| Static (frontier every time) | 1.0× | 1.0× | 1.0× | 1.0× | 1.0× |
-| **TierDecay** | 1.0× *(solve+distill)* | 0.2× *(probe)* | 0.2× *(probe)* | 0.2× *(decayed)* | 0.2× |
+| Static marginal | 1.0× | 1.0× | 1.0× | 1.0× | 1.0× |
+| Static cumulative | 1.0× | 2.0× | 3.0× | 4.0× | 5.0× |
+| **TierDecay marginal** | 1.1× *(solve+distill)* | 0.2× *(probe)* | 0.2× *(probe)* | 0.2× *(decayed)* | 0.2× |
+| **TierDecay cumulative** | 1.1× | 1.3× | 1.5× | 1.7× | 1.9× |
+
+Here `Δ = 0.8`, so both thresholds are `n ≥ 1`: the first reuse recovers the
+overhead for this illustration only. Failures or escalations would raise the
+realized cumulative cost above the table. TierDecay has no published benchmark.
 
 <div align="center">
 <img src="assets/economics.png" alt="A staircase of blocks stepping down from amber through teal to a long flat row of small green blocks — cost collapsing as classes decay to cheaper tiers" width="720" />
@@ -258,9 +278,9 @@ at `.cursor/rules/tierdecay.mdc`). See [`adapters/cline/`](adapters/cline/),
 
 ## FAQ
 
-**My CLI can't switch models mid-session.** Decay still pays: a playbook hit
-means fewer turns, fewer retries, tighter context — even on a single model.
-Full savings come from tier binding where supported.
+**My CLI can't switch models mid-session.** A playbook hit can still reduce
+turns, retries, and context — even on a single model. Tier-pricing savings
+require tier binding and depend on the fully loaded costs above.
 
 **What counts as a "class"?** A 2–4 token signature, `verb-object-surface`
 (`add-endpoint-rest`, `write-migration-postgres`). Signature discipline is
