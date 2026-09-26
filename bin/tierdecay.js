@@ -4,7 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { stableStringify, serialized } = require('../core/engine/canonical');
-const { parseLedger, parsePlaybook, observationRow } = require('../core/engine/markdown');
+const { CLASS_RE, TIERS, isIsoDate, parseLedger, parsePlaybook, observationRow } = require('../core/engine/markdown');
 const { route } = require('../core/engine/route');
 const { replay } = require('../core/engine/replay');
 
@@ -70,9 +70,20 @@ function state(options) {
 }
 
 function validateObservation(value) {
-  if (!value || typeof value !== 'object') throw Object.assign(new Error('observation must be an object'), { exitCode: 2 });
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw Object.assign(new Error('observation must be an object'), { exitCode: 2 });
   const allowed = new Set(['date', 'class', 'predicted', 'executed', 'outcome', 'escalations', 'playbook', 'obsId', 'resourceCost', 'failures', 'incidentLoss', 'risk', 'epoch']);
   for (const key of Object.keys(value)) if (!allowed.has(key)) throw Object.assign(new Error(`unknown observation property: ${key}`), { exitCode: 2 });
+  for (const key of allowed) if (!(key in value)) throw Object.assign(new Error(`missing observation property: ${key}`), { exitCode: 2 });
+  for (const key of ['date', 'class', 'predicted', 'executed', 'outcome', 'playbook', 'obsId', 'epoch']) {
+    if (typeof value[key] !== 'string') throw Object.assign(new Error(`${key} must be a JSON string`), { exitCode: 2 });
+  }
+  if (!isIsoDate(value.date)) throw Object.assign(new Error('date must be a valid YYYY-MM-DD date'), { exitCode: 2 });
+  if (!CLASS_RE.test(value.class)) throw Object.assign(new Error('class must be an exact 2-4 token signature'), { exitCode: 2 });
+  if (!TIERS.has(value.predicted) || !TIERS.has(value.executed)) throw Object.assign(new Error('predicted and executed must be T1, T2, or T3'), { exitCode: 2 });
+  if (!value.outcome) throw Object.assign(new Error('outcome must be non-empty'), { exitCode: 2 });
+  if (value.playbook !== '—' && !/^PB-[1-9][0-9]*$/.test(value.playbook)) throw Object.assign(new Error('playbook must be PB-n or —'), { exitCode: 2 });
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(value.obsId)) throw Object.assign(new Error('obsId is invalid or empty'), { exitCode: 2 });
+  if (!value.epoch || /\s/.test(value.epoch)) throw Object.assign(new Error('epoch must be a non-empty token'), { exitCode: 2 });
   const numerics = [
     ['resourceCost', 'resource_cost', false], ['failures', 'failures', true],
     ['incidentLoss', 'incident_loss', false], ['risk', 'risk', true],
@@ -87,6 +98,8 @@ function validateObservation(value) {
     if (!integer && value[key] < 0) throw Object.assign(new Error(`${label} must be finite and non-negative`), { exitCode: 2 });
   }
   if (value.risk > 3) throw Object.assign(new Error('risk must be between 0 and 3'), { exitCode: 2 });
+  if (value.outcome === 'pass' && value.failures !== 0) throw Object.assign(new Error('pass observation must have zero failures'), { exitCode: 2 });
+  if (value.outcome === 'fail' && value.failures === 0) throw Object.assign(new Error('fail observation must have failures'), { exitCode: 2 });
   try {
     const row = observationRow(value);
     const header = '| date | class | predicted | executed | outcome | esc | playbook | obs_id | resource_cost | failures | incident_loss | risk | epoch |';
@@ -116,10 +129,12 @@ function main(argv) {
     : ['scenario', 'ledger', 'playbook', 'config', 'policy']);
   for (const key of Object.keys(options)) if (!allowed.has(key)) throw Object.assign(new Error(`unknown option: --${key}`), { exitCode: 2 });
   const { ledger, playbook } = state(options);
-  const config = json(options.config || defaultFile('router-config.json'));
   if (command === 'route') {
-    output(route({ request: json(options.request), ledger, playbook, config, policy: options.policy || 'shadow' }));
+    const policy = options.policy || 'shadow';
+    const config = policy === 'legacy' ? null : json(options.config || defaultFile('router-config.json'));
+    output(route({ request: json(options.request), ledger, playbook, config, policy }));
   } else {
+    const config = json(options.config || defaultFile('router-config.json'));
     output(replay({ jsonl: read(options.scenario), ledger, playbook, config, policy: options.policy || 'shadow' }));
   }
 }

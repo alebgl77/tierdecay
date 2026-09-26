@@ -26,6 +26,18 @@ function isSeparator(row) {
   return row && row.every((cell) => /^:?-{3,}:?$/.test(cell));
 }
 
+function isIsoDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12) return false;
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day >= 1 && day <= days[month - 1];
+}
+
 function parseTier(value, legacy = false) {
   const tier = legacy ? /^T[1-3]/.exec(value)?.[0] : value;
   if (!TIERS.has(tier)) throw new StateError(`unknown tier: ${value}`);
@@ -105,7 +117,7 @@ function parseLedger(text) {
       escalations: uint(row[5], 'esc'),
       playbook: row[6]
     };
-    if (!common.date) throw new StateError('date must not be empty');
+    if (!isIsoDate(common.date)) throw new StateError('date must be a valid YYYY-MM-DD date');
     if (!common.outcome) throw new StateError('outcome must not be empty');
     if (!CLASS_RE.test(common.class)) throw new StateError(`invalid class signature: ${common.class}`);
     if (!isMeasuredTable) {
@@ -119,11 +131,14 @@ function parseLedger(text) {
     if (!epoch || /\s/.test(epoch)) throw new StateError('epoch is empty or contains whitespace');
     const numericRisk = uint(risk, 'risk');
     if (numericRisk > 3) throw new StateError('risk must be between 0 and 3');
+    const numericFailures = uint(failures, 'failures');
+    if (common.outcome === 'pass' && numericFailures !== 0) throw new StateError('pass observation must have zero failures');
+    if (common.outcome === 'fail' && numericFailures === 0) throw new StateError('fail observation must have failures');
     observations.push({
       ...common,
       obsId,
       resourceCost: nonnegative(resourceCost, 'resource_cost'),
-      failures: uint(failures, 'failures'),
+      failures: numericFailures,
       incidentLoss: nonnegative(incidentLoss, 'incident_loss'),
       risk: numericRisk,
       epoch
@@ -139,9 +154,15 @@ function parsePlaybook(text) {
   const lines = linesOf(text);
   const entries = [];
   let section = null;
+  let patternSections = 0;
+  let quarantineSections = 0;
   for (let index = 0; index < lines.length; index += 1) {
-    if (lines[index] === '## PATTERNS') { section = 'live'; continue; }
-    if (lines[index] === '## QUARANTINE') { section = 'quarantined'; continue; }
+    if (lines[index].startsWith('## ')) {
+      section = null;
+      if (lines[index] === '## PATTERNS') { patternSections += 1; section = 'live'; }
+      if (lines[index] === '## QUARANTINE') { quarantineSections += 1; section = 'quarantined'; }
+      continue;
+    }
     const heading = /^### (PB-[1-9][0-9]*) · ([a-z0-9]+(?:-[a-z0-9]+){1,3})$/.exec(lines[index]);
     if (!heading && lines[index].startsWith('### PB-')) throw new StateError(`invalid playbook heading: ${lines[index]}`);
     if (!heading) continue;
@@ -149,24 +170,34 @@ function parsePlaybook(text) {
     const block = [];
     for (index += 1; index < lines.length && !/^#{2,3} /.test(lines[index]); index += 1) block.push(lines[index]);
     index -= 1;
-    const provenanceLine = block.find((line) => line.startsWith('provenance:'));
+    const uniqueLine = (field, required = false) => {
+      const matches = block.filter((line) => line.startsWith(`${field}:`));
+      if (matches.length > 1) throw new StateError(`${heading[1]} has duplicate ${field}`);
+      if (required && matches.length !== 1) throw new StateError(`${heading[1]} is missing ${field}`);
+      return matches[0] || null;
+    };
+    const provenanceLine = uniqueLine('provenance', true);
     const provenance = /^provenance:\s*(T[1-3])\s+([0-9]{4}-[0-9]{2})\s+·\s+hits:\s*(0|[1-9][0-9]*)/.exec(provenanceLine || '');
     if (!provenance) throw new StateError(`${heading[1]} has an invalid provenance line`);
-    const floorLine = block.find((line) => line.startsWith('floor:'));
+    const floorLine = uniqueLine('floor');
     let floor = null;
     if (floorLine) {
       const match = /^floor:\s*(T[1-3]|none)\s*$/.exec(floorLine);
       if (!match) throw new StateError(`${heading[1]} has an invalid floor`);
       floor = match[1] === 'none' ? null : match[1];
     }
+    const epochLine = uniqueLine('epoch');
+    const bindingEpoch = epochLine ? /^epoch:\s*(\S+)\s*$/.exec(epochLine)?.[1] : null;
+    if (epochLine && !bindingEpoch) throw new StateError(`${heading[1]} has an invalid epoch`);
     const entry = {
       id: heading[1], class: heading[2], status: section,
-      provenance: provenance[1], epoch: provenance[2], hits: uint(provenance[3], 'hits'), floor
+      provenance: provenance[1], provenanceDate: provenance[2], bindingEpoch,
+      hits: uint(provenance[3], 'hits'), floor
     };
     for (const field of ['WHEN:', 'DO:', 'VERIFY:']) {
       if (!block.some((line) => line.startsWith(field))) throw new StateError(`${entry.id} is missing ${field}`);
     }
-    const statusLine = block.find((line) => line.startsWith('status:'));
+    const statusLine = uniqueLine('status');
     if (statusLine) {
       const status = /^status:\s*(live|quarantined)\s*$/.exec(statusLine)?.[1];
       if (!status || status !== section) throw new StateError(`${entry.id} status contradicts its section`);
@@ -177,10 +208,22 @@ function parsePlaybook(text) {
     if (entries.some((existing) => existing.id === entry.id)) throw new StateError(`duplicate playbook id: ${entry.id}`);
     entries.push(entry);
   }
-  const liveClasses = new Set();
-  for (const entry of entries.filter((item) => item.status === 'live')) {
-    if (liveClasses.has(entry.class)) throw new StateError(`ambiguous live playbooks for class: ${entry.class}`);
-    liveClasses.add(entry.class);
+  if (patternSections !== 1 || quarantineSections !== 1) {
+    throw new StateError('playbook must contain exactly one PATTERNS and one QUARANTINE section');
+  }
+  const classes = new Map();
+  for (const entry of entries) {
+    const grouped = classes.get(entry.class) || [];
+    grouped.push(entry);
+    classes.set(entry.class, grouped);
+  }
+  for (const [taskClass, grouped] of classes) {
+    const live = grouped.filter((entry) => entry.status === 'live');
+    const quarantined = grouped.filter((entry) => entry.status === 'quarantined');
+    if (live.length > 1) throw new StateError(`ambiguous live playbooks for class: ${taskClass}`);
+    if (live.length && quarantined.length) throw new StateError(`class has live and quarantined playbooks: ${taskClass}`);
+    const floors = new Set(grouped.map((entry) => entry.floor).filter(Boolean));
+    if (floors.size > 1) throw new StateError(`contradictory floors for class: ${taskClass}`);
   }
   entries.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   return { entries };
@@ -193,11 +236,12 @@ function observationRow(observation) {
     observation.resourceCost, observation.failures, observation.incidentLoss,
     observation.risk, observation.epoch
   ];
-  if (!observation.date || !observation.outcome) throw new StateError('observation date and outcome are required');
+  if (!isIsoDate(observation.date)) throw new StateError('observation date must be a valid YYYY-MM-DD date');
+  if (!observation.outcome) throw new StateError('observation outcome is required');
   for (const field of fields) {
     if (String(field).includes('|') || String(field).includes('\n')) throw new StateError('observation fields cannot contain pipes or newlines');
   }
   return `| ${fields.join(' | ')} |`;
 }
 
-module.exports = { CLASS_RE, TIERS, StateError, parseLedger, parsePlaybook, observationRow };
+module.exports = { CLASS_RE, TIERS, StateError, isIsoDate, parseLedger, parsePlaybook, observationRow };

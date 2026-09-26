@@ -2,7 +2,7 @@
 
 const { CLASS_RE, TIERS, StateError } = require('./markdown');
 const { canonicalHash, serialized } = require('./canonical');
-const { ValidationError, validateConfig, validateMeasurements, tierStatistics } = require('./statistics');
+const { ValidationError, validateConfig, validateMeasurements, tierStatistics, ensureFinite } = require('./statistics');
 
 const TIER_NUMBER = { T1: 1, T2: 2, T3: 3 };
 const NUMBER_TIER = { 1: 'T1', 2: 'T2', 3: 'T3' };
@@ -10,9 +10,9 @@ const NUMBER_TIER = { 1: 'T1', 2: 'T2', 3: 'T3' };
 function validateRequest(request) {
   if (!request || typeof request !== 'object' || Array.isArray(request)) throw new ValidationError('request must be an object');
   if (!CLASS_RE.test(request.class || '')) throw new ValidationError('request.class must be an exact 2-4 token class signature');
-  if (!Number.isInteger(request.risk) || request.risk < 0 || request.risk > 3) throw new ValidationError('request.risk must be an integer from 0 to 3');
+  if (!Number.isSafeInteger(request.risk) || request.risk < 0 || request.risk > 3) throw new ValidationError('request.risk must be a safe integer from 0 to 3');
   if (typeof request.critical !== 'boolean' || typeof request.recurring !== 'boolean') throw new ValidationError('request.critical and recurring must be booleans');
-  if (!Number.isInteger(request.horizon) || request.horizon < 1) throw new ValidationError('request.horizon must be a positive integer');
+  if (!Number.isSafeInteger(request.horizon) || request.horizon < 1) throw new ValidationError('request.horizon must be a positive safe integer');
   if (!request.epoch || typeof request.epoch !== 'string' || /\s/.test(request.epoch)) throw new ValidationError('request.epoch must be a non-empty token');
   if (request.playbook !== undefined && !/^PB-[1-9][0-9]*$/.test(request.playbook)) throw new ValidationError('request.playbook must be a PB-n id');
   if (!request.rubric || typeof request.rubric !== 'object') throw new ValidationError('request.rubric is required');
@@ -26,6 +26,7 @@ function validateRequest(request) {
       throw new ValidationError(`rubric.${axis} must be an integer from 0 to ${maximum}`);
     }
   }
+  if (request.risk !== request.rubric.riskSurface) throw new ValidationError('request.risk must equal rubric.riskSurface');
   return { ...request, rubric: { ...request.rubric } };
 }
 
@@ -37,13 +38,24 @@ function rubricTier(rubric) {
   return { tier: 'T1', score };
 }
 
-function resolveEntry(request, playbook) {
-  if (!request.playbook) return null;
-  const entry = playbook.entries.find((candidate) => candidate.id === request.playbook);
-  if (!entry) throw new StateError(`referenced playbook does not exist: ${request.playbook}`);
-  if (entry.class !== request.class) throw new StateError(`referenced playbook class mismatch: ${entry.id}`);
-  return entry;
+function resolveClassState(request, playbook) {
+  const entries = playbook.entries.filter((entry) => entry.class === request.class);
+  const live = entries.filter((entry) => entry.status === 'live');
+  const quarantined = entries.filter((entry) => entry.status === 'quarantined');
+  if (live.length > 1) throw new StateError(`ambiguous live playbooks for class: ${request.class}`);
+  if (live.length && quarantined.length) throw new StateError(`class has live and quarantined playbooks: ${request.class}`);
+  const floors = new Set(entries.map((entry) => entry.floor).filter(Boolean));
+  if (floors.size > 1) throw new StateError(`contradictory floors for class: ${request.class}`);
+  const state = { entries, live: live[0] || null, quarantined: quarantined.length > 0, floor: [...floors][0] || null, selected: null };
+  if (state.quarantined || !request.playbook) return state;
+  const selected = playbook.entries.find((candidate) => candidate.id === request.playbook);
+  if (!selected) throw new StateError(`referenced playbook does not exist: ${request.playbook}`);
+  if (selected.class !== request.class) throw new StateError(`referenced playbook class mismatch: ${selected.id}`);
+  state.selected = selected;
+  return state;
 }
+
+function higherTier(a, b) { return TIER_NUMBER[a] >= TIER_NUMBER[b] ? a : b; }
 
 function baselineWithoutPlaybook(request, ledger) {
   const prior = ledger.priors.find((candidate) => candidate.class === request.class);
@@ -52,93 +64,78 @@ function baselineWithoutPlaybook(request, ledger) {
   return { tier: rubric.tier, source: 'rubric', score: rubric.score };
 }
 
-function legacyRoute(request, ledger, playbook) {
+function legacyRoute(request, ledger, playbook, resolved = resolveClassState(request, playbook)) {
   if (request.critical || request.risk === 3) return { tier: 'T3', action: 'safety', reason: 'critical-or-risk3' };
-  const entry = resolveEntry(request, playbook);
+  if (resolved.quarantined) return { tier: 'T3', action: 'refusal', reason: 'quarantined-class' };
+  const entry = resolved.selected;
   if (entry) {
-    if (entry.status === 'quarantined') {
-      return { tier: 'T3', action: 'refusal', reason: 'quarantined-playbook', playbook: entry.id };
-    }
     const provenance = TIER_NUMBER[entry.provenance];
-    if (provenance === 1) return { tier: 'T1', action: 'exploit', reason: 'playbook-at-floor', playbook: entry.id };
+    if (provenance === 1) return { tier: higherTier('T1', resolved.floor || 'T1'), action: 'exploit', reason: 'playbook-at-floor', playbook: entry.id };
     const candidate = NUMBER_TIER[provenance - 1];
-    if (entry.floor && TIER_NUMBER[candidate] < TIER_NUMBER[entry.floor]) {
-      return { tier: entry.floor, action: 'refusal', reason: 'sticky-floor', playbook: entry.id };
+    if (resolved.floor && TIER_NUMBER[candidate] < TIER_NUMBER[resolved.floor]) {
+      return { tier: resolved.floor, action: 'refusal', reason: 'sticky-floor', playbook: entry.id };
     }
     return { tier: candidate, action: 'probe', reason: 'live-playbook', playbook: entry.id };
   }
   const baseline = baselineWithoutPlaybook(request, ledger);
+  if (resolved.floor && TIER_NUMBER[baseline.tier] < TIER_NUMBER[resolved.floor]) {
+    return { tier: resolved.floor, action: 'refusal', reason: 'sticky-floor' };
+  }
   return { ...baseline, action: 'route', reason: baseline.source };
 }
 
-function exactCell(ledger, request, initialTier) {
+function exactCell(ledger, request) {
   return ledger.observations.filter((observation) => observation.class === request.class
     && observation.risk === request.risk
-    && observation.epoch === request.epoch
-    && observation.predicted === initialTier)
+    && observation.epoch === request.epoch)
     .sort((a, b) => a.obsId < b.obsId ? -1 : a.obsId > b.obsId ? 1 : 0);
 }
 
-function safetyPromotion(tier, stats, request, config) {
-  if (tier === 'T3' || !stats || stats.n < config.minSamples) return null;
-  if (stats.failureUpper <= config.failureThresholds[request.risk]) return null;
-  return NUMBER_TIER[TIER_NUMBER[tier] + 1];
-}
-
-function evidencePromotion(incumbent, cell, request, config) {
-  let promoted = incumbent;
-  let promotedStats = tierStatistics(cell, promoted, config);
+function safeIncumbent(incumbent, cell, request, config) {
   const all = {};
-  if (promotedStats) all[promoted] = promotedStats;
-  for (let number = TIER_NUMBER[incumbent] + 1; number <= 3; number += 1) {
+  for (let number = TIER_NUMBER[incumbent]; number <= 3; number += 1) {
     const tier = NUMBER_TIER[number];
-    const candidate = tierStatistics(cell, tier, config);
-    if (candidate) all[tier] = candidate;
-    if (candidate && promotedStats
-        && candidate.n >= config.minSamples && promotedStats.n >= config.minSamples
-        && candidate.upper + config.margin < promotedStats.lower) {
-      promoted = tier;
-      promotedStats = candidate;
+    const stats = tierStatistics(cell, tier, config);
+    if (stats) all[tier] = stats;
+    if (stats && stats.n >= config.minSamples
+        && stats.failureUpper <= config.failureThresholds[request.risk]) {
+      return { tier, safe: true, reason: tier === incumbent ? 'incumbent-safe' : 'failure-upper-bound', statistics: all };
     }
   }
-  const failurePromotion = safetyPromotion(promoted, promotedStats, request, config);
-  if (failurePromotion) return { tier: failurePromotion, reason: 'failure-upper-bound', statistics: all };
-  if (promoted !== incumbent) return { tier: promoted, reason: 'higher-tier-dominates', statistics: all };
-  return null;
+  return { tier: 'T3', safe: false, reason: 'no-observed-safe-tier', statistics: all };
 }
 
-function optimizedRoute(request, ledger, playbook, config, legacy) {
+function optimizedRoute(request, ledger, playbook, config, legacy, resolved) {
   if (request.critical || request.risk === 3) return { ...legacy, action: 'safety' };
-  const entry = resolveEntry(request, playbook);
-  const initialTier = legacy.tier;
-  const cell = exactCell(ledger, request, initialTier);
+  if (resolved.quarantined) return { tier: 'T3', action: 'refusal', reason: 'quarantined-class' };
+  const entry = resolved.selected;
+  const cell = exactCell(ledger, request);
 
   if (!entry || entry.status !== 'live') {
     const incumbentStats = tierStatistics(cell, legacy.tier, config);
-    const promotion = evidencePromotion(legacy.tier, cell, request, config);
-    if (promotion) return { tier: promotion.tier, action: 'promotion', reason: promotion.reason, statistics: promotion.statistics };
+    const promotion = safeIncumbent(legacy.tier, cell, request, config);
+    if (promotion.safe === false || promotion.tier !== legacy.tier) return { tier: promotion.tier, action: 'promotion', reason: promotion.reason, statistics: promotion.statistics };
     return { ...legacy, statistics: incumbentStats ? { incumbent: incumbentStats } : {} };
   }
 
   const provenanceNumber = TIER_NUMBER[entry.provenance];
-  if (provenanceNumber === 1) return { tier: 'T1', action: 'exploit', reason: 'playbook-at-floor', playbook: entry.id };
   const incumbent = entry.provenance;
+  const promotion = safeIncumbent(incumbent, cell, request, config);
+  if (promotion.safe === false || promotion.tier !== incumbent) {
+    return { tier: promotion.tier, action: 'promotion', reason: promotion.reason, playbook: entry.id, statistics: promotion.statistics };
+  }
+  if (provenanceNumber === 1) return { tier: 'T1', action: 'exploit', reason: 'playbook-at-floor', playbook: entry.id, statistics: promotion.statistics };
   const lower = NUMBER_TIER[provenanceNumber - 1];
-  if (entry.floor && TIER_NUMBER[lower] < TIER_NUMBER[entry.floor]) {
+  if (resolved.floor && TIER_NUMBER[lower] < TIER_NUMBER[resolved.floor]) {
     return { tier: incumbent, action: 'refusal', reason: 'sticky-floor', playbook: entry.id };
   }
 
   const incumbentStats = tierStatistics(cell, incumbent, config);
   const lowerStats = tierStatistics(cell, lower, config);
-  const promotion = evidencePromotion(incumbent, cell, request, config);
-  if (promotion) {
-    return { tier: promotion.tier, action: 'promotion', reason: promotion.reason, playbook: entry.id, statistics: { ...promotion.statistics, lower: lowerStats } };
-  }
-
   const statistics = { incumbent: incumbentStats, lower: lowerStats };
   if (incumbentStats && lowerStats
       && incumbentStats.n >= config.minSamples && lowerStats.n >= config.minSamples
-      && lowerStats.upper + config.margin < incumbentStats.lower
+      && ensureFinite(lowerStats.upper + config.margin, 'exploit comparison') < incumbentStats.lower
       && lowerStats.failureUpper <= config.failureThresholds[request.risk]) {
     return { tier: lower, action: 'exploit', reason: 'established-lower-tier', playbook: entry.id, statistics };
   }
@@ -151,8 +148,8 @@ function optimizedRoute(request, ledger, playbook, config, legacy) {
 
   let voi = null;
   if (incumbentStats && lowerStats) {
-    voi = (request.horizon - 1) * Math.max(0, incumbentStats.mean - lowerStats.lower)
-      - (Math.max(0, lowerStats.upper - incumbentStats.mean) + config.probeOverhead);
+    voi = ensureFinite((request.horizon - 1) * Math.max(0, incumbentStats.mean - lowerStats.lower)
+      - (Math.max(0, lowerStats.upper - incumbentStats.mean) + config.probeOverhead), 'VOI');
   }
   if (request.recurring && request.horizon >= 2 && request.risk <= config.maxProbeRisk
       && voi !== null && voi > config.minimumVoi
@@ -165,7 +162,8 @@ function optimizedRoute(request, ledger, playbook, config, legacy) {
 function route({ request, ledger, playbook, config, policy = 'shadow' }) {
   const checkedRequest = validateRequest(request);
   if (!['legacy', 'shadow', 'optimize'].includes(policy)) throw new ValidationError('policy must be legacy, shadow, or optimize');
-  const legacy = legacyRoute(checkedRequest, ledger, playbook);
+  const resolved = resolveClassState(checkedRequest, playbook);
+  const legacy = legacyRoute(checkedRequest, ledger, playbook, resolved);
   const warnings = [];
   let recommended = legacy;
   let effective = legacy;
@@ -178,7 +176,7 @@ function route({ request, ledger, playbook, config, policy = 'shadow' }) {
     } else {
       if (checkedRequest.epoch !== checkedConfig.bindingEpoch) throw new ValidationError('request epoch does not match calibrated bindingEpoch');
       validateMeasurements(ledger.observations, checkedConfig);
-      recommended = optimizedRoute(checkedRequest, ledger, playbook, checkedConfig, legacy);
+      recommended = optimizedRoute(checkedRequest, ledger, playbook, checkedConfig, legacy, resolved);
       if (policy === 'optimize') effective = recommended;
     }
   }
@@ -198,7 +196,7 @@ function route({ request, ledger, playbook, config, policy = 'shadow' }) {
     warnings,
     assumptions: {
       classMatch: 'exact', risk: checkedRequest.risk, epoch: checkedRequest.epoch,
-      initialTier: legacy.tier, horizon: checkedRequest.horizon
+      initialTier: effective.tier, horizon: checkedRequest.horizon
     },
     stateHash: canonicalHash(state)
   });

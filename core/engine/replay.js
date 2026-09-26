@@ -1,7 +1,7 @@
 'use strict';
 
 const { canonicalHash, serialized } = require('./canonical');
-const { ValidationError, validateConfig, metricLoss } = require('./statistics');
+const { ValidationError, validateConfig, metricLoss, ensureFinite } = require('./statistics');
 const { route, validateRequest } = require('./route');
 
 class IncompleteReplayError extends Error {
@@ -30,7 +30,7 @@ function validateOutcome(value, label, config) {
   for (const key of ['resourceCost', 'failures', 'escalations', 'incidentLoss']) {
     if (!Number.isFinite(value[key]) || value[key] < 0) throw new ValidationError(`${label}.${key} must be finite and non-negative`);
   }
-  if (!Number.isInteger(value.failures) || !Number.isInteger(value.escalations)) throw new ValidationError(`${label} failures/escalations must be integers`);
+  if (!Number.isSafeInteger(value.failures) || !Number.isSafeInteger(value.escalations)) throw new ValidationError(`${label} failures/escalations must be safe integers`);
   if (value.resourceCost > config.costCap || value.incidentLoss > config.incidentCap
       || value.failures > config.maximumFailures || value.escalations > config.maximumEscalations) {
     throw new ValidationError(`${label} outcome exceeds configured caps`);
@@ -71,24 +71,24 @@ function replay({ jsonl, ledger, playbook, config, policy = 'shadow' }) {
     const chosenLoss = metricLoss(chosen, request.risk, checkedConfig);
     const legacyLoss = metricLoss(legacy, request.risk, checkedConfig);
     const bestLoss = Math.min(...Object.values(outcomes).map((outcome) => metricLoss(outcome, request.risk, checkedConfig)));
-    totals.fullyLoadedLoss += chosenLoss;
-    totals.legacyFullyLoadedLoss += legacyLoss;
-    totals.resourceCost += chosen.resourceCost;
-    totals.failures += chosen.failures;
-    totals.escalations += chosen.escalations;
-    totals.incidents += chosen.incidentLoss > 0 ? 1 : 0;
-    totals.regret += chosenLoss - bestLoss;
+    totals.fullyLoadedLoss = ensureFinite(totals.fullyLoadedLoss + chosenLoss, 'cumulative fully loaded loss');
+    totals.legacyFullyLoadedLoss = ensureFinite(totals.legacyFullyLoadedLoss + legacyLoss, 'cumulative legacy loss');
+    totals.resourceCost = ensureFinite(totals.resourceCost + chosen.resourceCost, 'cumulative resource cost');
+    totals.failures = ensureFinite(totals.failures + chosen.failures, 'cumulative failures');
+    totals.escalations = ensureFinite(totals.escalations + chosen.escalations, 'cumulative escalations');
+    totals.incidents = ensureFinite(totals.incidents + (chosen.incidentLoss > 0 ? 1 : 0), 'cumulative incidents');
+    totals.regret = ensureFinite(totals.regret + chosenLoss - bestLoss, 'cumulative regret');
     if (decision.effective.action === 'probe') totals.probes += 1;
     if (decision.effective.action === 'promotion' || decision.effective.action === 'safety') totals.promotions += 1;
     if (decision.effective.action === 'refusal') totals.refusals += 1;
     working.observations.push({
-      date: scenario.date || 'replay', class: request.class, predicted: decision.legacy.tier,
+      date: scenario.date || 'replay', class: request.class, predicted: chosenTier,
       executed: chosenTier, outcome: chosen.failures > 0 ? 'fail' : 'pass', escalations: chosen.escalations,
       playbook: request.playbook || '—', obsId: scenario.id, resourceCost: chosen.resourceCost,
       failures: chosen.failures, incidentLoss: chosen.incidentLoss, risk: request.risk, epoch: request.epoch
     });
     working.observations.sort((a, b) => a.obsId < b.obsId ? -1 : a.obsId > b.obsId ? 1 : 0);
-    decisions.push({ id: scenario.id, tier: chosenTier, action: decision.effective.action, stateHash: decision.stateHash });
+    decisions.push({ id: scenario.id, tier: chosenTier, predicted: chosenTier, executed: chosenTier, action: decision.effective.action, stateHash: decision.stateHash });
   }
   return serialized({
     schemaVersion: 1,

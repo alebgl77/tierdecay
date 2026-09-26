@@ -9,7 +9,7 @@
     "risk": { "type": "integer", "minimum": 0, "maximum": 3 },
     "critical": { "type": "boolean" },
     "recurring": { "type": "boolean" },
-    "horizon": { "type": "integer", "minimum": 1 },
+    "horizon": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
     "epoch": { "type": "string", "pattern": "^\\S+$" },
     "playbook": { "type": "string", "pattern": "^PB-[1-9][0-9]*$" },
     "rubric": {
@@ -22,5 +22,11 @@
         "riskSurface": { "type": "integer", "minimum": 0, "maximum": 3 }
       }
     }
-  }
+  },
+  "allOf": [
+    { "if": { "properties": { "risk": { "const": 0 } } }, "then": { "properties": { "rubric": { "properties": { "riskSurface": { "const": 0 } } } } } },
+    { "if": { "properties": { "risk": { "const": 1 } } }, "then": { "properties": { "rubric": { "properties": { "riskSurface": { "const": 1 } } } } } },
+    { "if": { "properties": { "risk": { "const": 2 } } }, "then": { "properties": { "rubric": { "properties": { "riskSurface": { "const": 2 } } } } } },
+    { "if": { "properties": { "risk": { "const": 3 } } }, "then": { "properties": { "rubric": { "properties": { "riskSurface": { "const": 3 } } } } } }
+  ]
 }

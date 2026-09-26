@@ -22,8 +22,8 @@
       "required": ["resourceCost", "failures", "escalations", "incidentLoss"],
       "properties": {
         "resourceCost": { "type": "number", "minimum": 0 },
-        "failures": { "type": "integer", "minimum": 0 },
-        "escalations": { "type": "integer", "minimum": 0 },
+        "failures": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "escalations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
         "incidentLoss": { "type": "number", "minimum": 0 }
       }
     }

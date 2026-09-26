@@ -3,7 +3,7 @@
   "calibrated": false,
   "bindingEpoch": null,
   "costUnit": null,
-  "delta": null,
+  "confidenceDelta": null,
   "costCap": null,
   "incidentCap": null,
   "failurePenalty": null,

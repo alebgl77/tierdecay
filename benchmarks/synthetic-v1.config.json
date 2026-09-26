@@ -3,7 +3,7 @@
   "calibrated": true,
   "bindingEpoch": "synthetic-v1",
   "costUnit": "synthetic-unit",
-  "delta": 0.05,
+  "confidenceDelta": 0.05,
   "costCap": 10,
   "incidentCap": 10,
   "failurePenalty": 3,

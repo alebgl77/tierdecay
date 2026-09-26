@@ -22,4 +22,4 @@ not a hash of raw Markdown formatting.
 For this fixture in `shadow`: 3 scenarios, fully loaded/resource loss `10.2`,
 0 failures, 0 escalations, 0 incidents, 2 probes, 1 safety promotion, 0
 refusals, regret `0`, and final state hash
-`146dd7d1e0e2b793d67596197b35475c8c084ef87127e660bdc39bca67e08097`.
+`5eaef9cb532a4215c003072f8ac35b3839559e439e3925d70e81d2bfb55a029f`.

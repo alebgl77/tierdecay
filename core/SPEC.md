@@ -103,11 +103,12 @@ for the orchestrator to apply. Its default `shadow` policy always keeps the
 legacy §2 decision effective. `optimize` is explicit opt-in and requires a
 calibrated economic configuration. See `ROUTER.md` and `schemas/`.
 
-Safety precedes optimization: critical or risk-3 work is T3; T0 is never an
-execution result; quarantine and sticky floors fail closed. A lower candidate
-requires an explicitly referenced, exact-class live playbook and is at most one
-tier below provenance. Statistical evidence never crosses exact
-`(class, risk, epoch, predicted)` cells. Legacy rows remain readable but are not
+Safety precedes optimization: request risk must exactly equal the rubric risk;
+critical or risk-3 work is T3; T0 is never an execution result. Quarantine and
+sticky floors apply to the whole exact class, even without a referenced ID. A
+lower candidate requires an explicitly referenced live playbook and is at most
+one tier below provenance. Statistical evidence never crosses exact
+`(class, risk, epoch, executed)` cells. Legacy rows remain readable but are not
 measurements. State ambiguity or invalid numeric data is an error, not a guess.
 
 The advisor is deterministic: no network, clock, randomness, locale ordering,

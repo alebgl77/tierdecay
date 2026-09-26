@@ -18,7 +18,7 @@ const measuredLedger = () => parseLedger(fixture('measured-ledger.md'));
 const playbook = () => parsePlaybook(fixture('legacy-playbook.md'));
 const disabled = JSON.parse(fs.readFileSync(path.join(ROOT, 'core/router-config.template.json'), 'utf8'));
 const config = (overrides = {}) => ({
-  enabled: true, calibrated: true, delta: 0.05, costCap: 10, incidentCap: 10,
+  enabled: true, calibrated: true, confidenceDelta: 0.05, costCap: 10, incidentCap: 10,
   bindingEpoch: 'bindings-a', costUnit: 'test-unit',
   failurePenalty: 3, escalationPenalty: 2, riskWeight: 2,
   riskExposure: [0, 1, 2, 4], minSamples: 3, margin: 0.1,
@@ -26,22 +26,29 @@ const config = (overrides = {}) => ({
   minimumVoi: 0.1, maxProbeRisk: 2, maximumFailures: 4, maximumEscalations: 2,
   ...overrides
 });
-const request = (overrides = {}) => ({
-  class: 'add-adapter-cli', risk: 1, critical: false, recurring: true,
-  horizon: 5, epoch: 'bindings-a', playbook: 'PB-1',
-  rubric: { ambiguity: 1, reasoning: 1, blastRadius: 1, riskSurface: 1 },
-  ...overrides
-});
+const request = (overrides = {}) => {
+  const base = {
+    class: 'add-adapter-cli', risk: 1, critical: false, recurring: true,
+    horizon: 5, epoch: 'bindings-a', playbook: 'PB-1',
+    rubric: { ambiguity: 1, reasoning: 1, blastRadius: 1, riskSurface: 1 }
+  };
+  const merged = { ...base, ...overrides };
+  if (overrides.risk !== undefined && overrides.rubric === undefined) {
+    merged.rubric = { ...base.rubric, riskSurface: overrides.risk };
+  }
+  return merged;
+};
 
 function observations({ count = 100, risk = 1, epoch = 'bindings-a', lowerCost = 4, incumbentCost = 5, lowerFailures = 0, incumbentFailures = 0 }) {
   const result = [];
   for (let i = 0; i < count; i += 1) {
     for (const [tier, cost, failures, suffix] of [['T1', lowerCost, lowerFailures, 'l'], ['T2', incumbentCost, incumbentFailures, 'i']]) {
+      const failureCount = typeof failures === 'function' ? failures(i) : failures;
       result.push({
         date: '2026-09-20', class: 'add-adapter-cli', predicted: 'T1', executed: tier,
-        outcome: failures ? 'fail' : 'pass', escalations: 0, playbook: 'PB-1',
+        outcome: failureCount ? 'fail' : 'pass', escalations: 0, playbook: 'PB-1',
         obsId: `${epoch}-${risk}-${String(i).padStart(4, '0')}-${suffix}`,
-        resourceCost: cost, failures: typeof failures === 'function' ? failures(i) : failures,
+        resourceCost: cost, failures: failureCount,
         incidentLoss: 0, risk, epoch
       });
     }
@@ -59,6 +66,13 @@ function test(name, fn) {
   catch (error) { process.stderr.write(`not ok ${count + 1} - ${name}\n${error.stack}\n`); process.exitCode = 1; }
 }
 function throws(fn, pattern) { assert.throws(fn, pattern); }
+function caught(fn, pattern) {
+  let error;
+  try { fn(); } catch (candidate) { error = candidate; }
+  assert.ok(error, 'expected function to throw');
+  assert.match(String(error), pattern);
+  return error;
+}
 
 test('byte-identical routing output', () => {
   const input = { request: request(), ledger: measuredLedger(), playbook: playbook(), config: disabled, policy: 'shadow' };
@@ -86,8 +100,8 @@ test('exact class match does not fuzzy merge', () => {
 test('exact epoch isolates statistical cells', () => {
   const rows = observations({ epoch: 'old' });
   const result = route({ request: request({ epoch: 'new' }), ledger: stateWith(rows), playbook: playbook(), config: config({ bindingEpoch: 'new' }), policy: 'optimize' });
-  assert.equal(result.effective.tier, 'T2');
-  assert.equal(result.effective.reason, 'insufficient-safe-evidence');
+  assert.equal(result.effective.tier, 'T3');
+  assert.equal(result.effective.reason, 'no-observed-safe-tier');
 });
 
 test('legacy seven-column ledger remains valid but has no measurements', () => {
@@ -120,6 +134,7 @@ test('values beyond configured caps are rejected', () => {
 test('failure counts beyond the calibrated cap are rejected', () => {
   const ledger = measuredLedger();
   ledger.observations[0].failures = 5;
+  ledger.observations[0].outcome = 'fail';
   throws(() => route({ request: request(), ledger, playbook: playbook(), config: config(), policy: 'optimize' }), /exceeds maximumFailures/);
 });
 
@@ -137,10 +152,34 @@ test('risk 3 routes T3 before playbook descent', () => {
   assert.equal(result.effective.tier, 'T3');
 });
 
+test('request risk and rubric riskSurface cannot diverge in either direction', () => {
+  const lowRubric = request({ risk: 3, rubric: { ambiguity: 0, reasoning: 0, blastRadius: 0, riskSurface: 0 } });
+  const highRubric = request({ risk: 0, rubric: { ambiguity: 0, reasoning: 0, blastRadius: 0, riskSurface: 3 } });
+  for (const candidate of [lowRubric, highRubric]) {
+    const error = caught(() => route({ request: candidate, ledger: legacyLedger(), playbook: playbook(), config: null, policy: 'legacy' }), /must equal/);
+    assert.equal(error.exitCode, 2);
+  }
+});
+
 test('quarantined playbook fails closed', () => {
   const result = route({ request: request({ class: 'fix-api-client', playbook: 'PB-2' }), ledger: legacyLedger(), playbook: playbook(), config: null, policy: 'legacy' });
   assert.equal(result.effective.tier, 'T3');
   assert.equal(result.effective.action, 'refusal');
+});
+
+test('class quarantine fails closed without an id and cannot be bypassed by another id', () => {
+  const withoutId = route({ request: request({ class: 'fix-api-client', playbook: undefined }), ledger: legacyLedger(), playbook: playbook(), config: null, policy: 'legacy' });
+  const wrongId = route({ request: request({ class: 'fix-api-client', playbook: 'PB-1' }), ledger: legacyLedger(), playbook: playbook(), config: null, policy: 'legacy' });
+  assert.equal(withoutId.effective.tier, 'T3');
+  assert.equal(wrongId.effective.tier, 'T3');
+});
+
+test('class floor applies without an explicit playbook id', () => {
+  const pb = parsePlaybook(fixture('legacy-playbook.md').replace('floor: T1', 'floor: T2'));
+  const low = request({ risk: 0, playbook: undefined, rubric: { ambiguity: 0, reasoning: 0, blastRadius: 0, riskSurface: 0 } });
+  const result = route({ request: low, ledger: { priors: [], legacy: [], observations: [] }, playbook: pb, config: null, policy: 'legacy' });
+  assert.equal(result.effective.tier, 'T2');
+  assert.equal(result.effective.reason, 'sticky-floor');
 });
 
 test('sticky floor prevents descent', () => {
@@ -161,7 +200,7 @@ test('playbook descent is at most one tier', () => {
 });
 
 test('VOI is monotone in horizon for a fixed exact cell', () => {
-  const ledger = stateWith(observations({ count: 200 }));
+  const ledger = stateWith(observations({ count: 1000 }));
   const cfg = config({ minSamples: 1000, probeOverhead: 2, minimumVoi: 0.1 });
   const short = route({ request: request({ horizon: 2 }), ledger, playbook: playbook(), config: cfg, policy: 'optimize' });
   const long = route({ request: request({ horizon: 8 }), ledger, playbook: playbook(), config: cfg, policy: 'optimize' });
@@ -172,7 +211,8 @@ test('VOI is monotone in horizon for a fixed exact cell', () => {
 
 test('risk penalty cannot make a failing lower tier more attractive', () => {
   const failRate = (i) => i < 20 ? 1 : 0;
-  const rows = [...observations({ count: 200, risk: 0, lowerFailures: failRate }), ...observations({ count: 200, risk: 2, lowerFailures: failRate })];
+  const scaledFailRate = (i) => i < 100 ? 1 : 0;
+  const rows = [...observations({ count: 1000, risk: 0, lowerFailures: scaledFailRate }), ...observations({ count: 1000, risk: 2, lowerFailures: scaledFailRate })];
   const cfg = config({ minSamples: 1000, failurePenalty: 0, riskWeight: 20, riskExposure: [0, 1, 5, 10], failureThresholds: [0.8, 0.8, 0.8, 0] });
   const low = route({ request: request({ risk: 0, horizon: 10 }), ledger: stateWith(rows), playbook: playbook(), config: cfg, policy: 'optimize' });
   const high = route({ request: request({ risk: 2, horizon: 10 }), ledger: stateWith(rows), playbook: playbook(), config: cfg, policy: 'optimize' });
@@ -199,18 +239,35 @@ test('homogeneous economic scaling preserves route', () => {
 
 test('ties choose the higher tier', () => {
   const ledger = stateWith(observations({ count: 200, lowerCost: 5, incumbentCost: 5 }));
-  const result = route({ request: request({ horizon: 20 }), ledger, playbook: playbook(), config: config({ minSamples: 1000, probeOverhead: 0, minimumVoi: 0 }), policy: 'optimize' });
+  const result = route({ request: request({ horizon: 20 }), ledger, playbook: playbook(), config: config({ minSamples: 200, probeOverhead: 0, minimumVoi: 0 }), policy: 'optimize' });
   assert.equal(result.effective.tier, 'T2');
 });
 
-test('statistically dominant higher tier promotes before descent', () => {
-  const rows = observations({ count: 200, lowerCost: 4, incumbentCost: 5 });
+test('known unsafe incumbent promotes to first observed safe higher tier', () => {
+  const rows = observations({ count: 200, lowerCost: 4, incumbentCost: 5, incumbentFailures: 1 });
   for (let i = 0; i < 200; i += 1) {
-    rows.push({ ...rows[i * 2 + 1], executed: 'T3', resourceCost: 1, obsId: `bindings-a-1-${String(i).padStart(4, '0')}-h` });
+    rows.push({ ...rows[i * 2 + 1], executed: 'T3', resourceCost: 1, failures: 0, outcome: 'pass', obsId: `bindings-a-1-${String(i).padStart(4, '0')}-h` });
   }
   const result = route({ request: request(), ledger: stateWith(rows), playbook: playbook(), config: config(), policy: 'optimize' });
   assert.equal(result.effective.tier, 'T3');
-  assert.equal(result.effective.reason, 'higher-tier-dominates');
+  assert.equal(result.effective.reason, 'failure-upper-bound');
+});
+
+test('no observed safe tier fails closed at T3 without descent', () => {
+  const rows = observations({ count: 200, incumbentFailures: 1 });
+  for (let i = 0; i < 200; i += 1) {
+    rows.push({ ...rows[i * 2 + 1], executed: 'T3', failures: 1, outcome: 'fail', obsId: `unsafe-${String(i).padStart(4, '0')}` });
+  }
+  const result = route({ request: request(), ledger: stateWith(rows), playbook: playbook(), config: config({ minSamples: 200 }), policy: 'optimize' });
+  assert.equal(result.effective.tier, 'T3');
+  assert.equal(result.effective.reason, 'no-observed-safe-tier');
+});
+
+test('executed tier, not predicted label, determines statistical evidence', () => {
+  const rows = observations({ count: 1000 }).map((row) => ({ ...row, predicted: 'T3' }));
+  const result = route({ request: request({ horizon: 8 }), ledger: stateWith(rows), playbook: playbook(), config: config({ minSamples: 1000 }), policy: 'optimize' });
+  assert.equal(result.effective.tier, 'T1');
+  assert.equal(result.effective.action, 'probe');
 });
 
 test('shadow effective decision is exactly legacy', () => {
@@ -242,12 +299,65 @@ test('ambiguous live playbook entries are rejected', () => {
   throws(() => parsePlaybook(text), /ambiguous live playbooks/);
 });
 
+test('live and quarantined entries for one class are rejected', () => {
+  const text = fixture('legacy-playbook.md').replace('### PB-2 · fix-api-client', '### PB-2 · add-adapter-cli');
+  throws(() => parsePlaybook(text), /live and quarantined/);
+});
+
+test('contradictory class floors are rejected', () => {
+  const extra = '### PB-3 · fix-api-client\nprovenance: T3 2026-09 · hits: 0\nfloor: T1\nWHEN: duplicate quarantine.\nDO: stop.\nVERIFY: review.\n\n';
+  const text = fixture('legacy-playbook.md').replace('## QUARANTINE\n\n', `## QUARANTINE\n\n${extra}`);
+  throws(() => parsePlaybook(text), /contradictory floors/);
+});
+
+test('playbook sections are exact, unique, and reset on unrelated headings', () => {
+  throws(() => parsePlaybook(fixture('legacy-playbook.md').replace('## PATTERNS', '## OTHER')), /outside PATTERNS|exactly one/);
+  throws(() => parsePlaybook(fixture('legacy-playbook.md').replace('## QUARANTINE', '## PATTERNS\n\n## QUARANTINE')), /exactly one/);
+  throws(() => parsePlaybook(fixture('legacy-playbook.md').replace('## QUARANTINE', '## OTHER\n\n## QUARANTINE').replace('### PB-2', '## OTHER TWO\n\n### PB-2')), /outside PATTERNS/);
+});
+
+test('duplicate unique playbook fields are rejected', () => {
+  const source = fixture('legacy-playbook.md');
+  const variants = [
+    source.replace('provenance: T2 2026-09 · hits: 0', 'provenance: T2 2026-09 · hits: 0\nprovenance: T2 2026-09 · hits: 0'),
+    source.replace('floor: T1', 'floor: T1\nfloor: T1'),
+    source.replace('floor: T1', 'floor: T1\nstatus: live\nstatus: live'),
+    source.replace('floor: T1', 'floor: T1\nepoch: bindings-a\nepoch: bindings-a')
+  ];
+  for (const text of variants) throws(() => parsePlaybook(text), /duplicate/);
+});
+
 test('contradictory playbook floor is rejected', () => {
   throws(() => parsePlaybook(fixture('legacy-playbook.md').replace('floor: T1', 'floor: T3')), /contradictory floor/);
 });
 
 test('empty measured epoch is rejected', () => {
   throws(() => parseLedger(fixture('measured-ledger.md').replace(' | bindings-a |', ' |  |')), /epoch is empty/);
+});
+
+test('old epoch may exceed current caps but remains globally validated', () => {
+  const ledger = measuredLedger();
+  ledger.observations.push({ ...ledger.observations[0], obsId: 'old-large', epoch: 'old', resourceCost: 100, incidentLoss: 100, failures: 20, outcome: 'fail', escalations: 20 });
+  assert.doesNotThrow(() => route({ request: request(), ledger, playbook: playbook(), config: config(), policy: 'optimize' }));
+  const invalid = { ...ledger, observations: ledger.observations.map((row) => row.obsId === 'old-large' ? { ...row, resourceCost: -1 } : row) };
+  throws(() => route({ request: request(), ledger: invalid, playbook: playbook(), config: config(), policy: 'optimize' }), /finite and non-negative/);
+  const duplicate = { ...ledger, observations: [...ledger.observations, { ...ledger.observations[0], epoch: 'old' }] };
+  throws(() => route({ request: request(), ledger: duplicate, playbook: playbook(), config: config(), policy: 'optimize' }), /duplicate obs_id/);
+});
+
+test('safe-integer and arithmetic overflow become validation errors', () => {
+  throws(() => route({ request: request({ horizon: Number.MAX_SAFE_INTEGER + 1 }), ledger: legacyLedger(), playbook: playbook(), config: null, policy: 'legacy' }), /safe integer/);
+  throws(() => validateConfig({ ...config(), maximumFailures: Number.MAX_SAFE_INTEGER + 1 }), /safe integer/);
+  const overflow = config({ failurePenalty: Number.MAX_VALUE, riskWeight: Number.MAX_VALUE });
+  const error = caught(() => route({ request: request(), ledger: stateWith(observations({ count: 3 })), playbook: playbook(), config: overflow, policy: 'optimize' }), /must remain finite/);
+  assert.equal(error.exitCode, 2);
+});
+
+test('confidenceDelta is divided across 4 metrics and 3 tiers', () => {
+  const rows = observations({ count: 100 });
+  const stats = tierStatistics(rows, 'T1', config());
+  const expected = Math.sqrt(Math.log(2 / (0.05 / 12)) / (2 * 100));
+  assert.equal(stats.components.failure.width, expected);
 });
 
 test('current repository examples parse', () => {
@@ -264,12 +374,25 @@ test('replay is deterministic and reports all cumulative metrics', () => {
     assert.equal(typeof a.totals[key], 'number');
   }
   assert.match(a.finalStateHash, /^[0-9a-f]{64}$/);
+  for (const decision of a.decisions) {
+    assert.equal(decision.predicted, decision.tier);
+    assert.equal(decision.executed, decision.tier);
+  }
 });
 
 test('replay refuses causal comparison for incomplete outcomes', () => {
   const line = JSON.parse(fixture('adversarial-replay.jsonl').split('\n')[0]);
   delete line.outcomes.T2;
   throws(() => replay({ jsonl: JSON.stringify(line), ledger: measuredLedger(), playbook: playbook(), config: config(), policy: 'shadow' }), /outcome is missing/);
+});
+
+test('replay cumulative arithmetic overflow is validation error code 2', () => {
+  const req = request({ risk: 0, playbook: undefined, rubric: { ambiguity: 0, reasoning: 0, blastRadius: 0, riskSurface: 0 } });
+  const outcome = { resourceCost: 1e308, failures: 0, escalations: 0, incidentLoss: 0 };
+  const jsonl = ['overflow-1', 'overflow-2'].map((id) => JSON.stringify({ id, date: '2026-09-25', request: req, outcomes: { T1: outcome, T2: outcome, T3: outcome } })).join('\n');
+  const cfg = config({ costCap: Number.MAX_VALUE, failurePenalty: 0, escalationPenalty: 0, riskWeight: 0 });
+  const error = caught(() => replay({ jsonl, ledger: legacyLedger(), playbook: playbook(), config: cfg, policy: 'legacy' }), /cumulative fully loaded loss must remain finite/);
+  assert.equal(error.exitCode, 2);
 });
 
 test('CLI route, observe, and replay contracts work', () => {
@@ -289,6 +412,13 @@ test('CLI route, observe, and replay contracts work', () => {
   const observed = spawnSync(process.execPath, [cli, 'observe', '--observation', observation], { encoding: 'utf8' });
   assert.equal(observed.status, 0, observed.stderr);
   assert.match(observed.stdout, /^\| 2026-09-25 \|/);
+  const stringFields = ['date', 'class', 'predicted', 'executed', 'outcome', 'playbook', 'obsId', 'epoch'];
+  for (const field of stringFields) {
+    const invalid = write(`observation-string-${field}.json`, JSON.stringify({ ...validObservation, [field]: 1 }));
+    const rejected = spawnSync(process.execPath, [cli, 'observe', '--observation', invalid], { encoding: 'utf8' });
+    assert.equal(rejected.status, 2, `${field}: ${rejected.stderr}`);
+    assert.match(rejected.stderr, /must be a JSON string/);
+  }
   const numericLabels = { resourceCost: 'resource_cost', failures: 'failures', incidentLoss: 'incident_loss', risk: 'risk', escalations: 'esc' };
   for (const [field, label] of Object.entries(numericLabels)) {
     const invalid = write(`observation-${field}.json`, JSON.stringify({ ...validObservation, [field]: String(validObservation[field]) }));
@@ -314,9 +444,42 @@ test('CLI route, observe, and replay contracts work', () => {
   const rejectedOverflow = spawnSync(process.execPath, [cli, 'observe', '--observation', overflow], { encoding: 'utf8' });
   assert.equal(rejectedOverflow.status, 2, rejectedOverflow.stderr);
   assert.match(rejectedOverflow.stderr, /resource_cost must be a finite JSON number/);
+  const semanticInvalid = [
+    [{ date: '2026-02-30' }, /valid YYYY-MM-DD/],
+    [{ class: 'bad' }, /2-4 token/],
+    [{ predicted: 'T0' }, /must be T1/],
+    [{ epoch: 'two words' }, /non-empty token/],
+    [{ outcome: 'pass', failures: 1 }, /pass observation/],
+    [{ outcome: 'fail', failures: 0 }, /fail observation/]
+  ];
+  for (let i = 0; i < semanticInvalid.length; i += 1) {
+    const [change, pattern] = semanticInvalid[i];
+    const invalid = write(`observation-semantic-${i}.json`, JSON.stringify({ ...validObservation, ...change }));
+    const rejected = spawnSync(process.execPath, [cli, 'observe', '--observation', invalid], { encoding: 'utf8' });
+    assert.equal(rejected.status, 2, rejected.stderr);
+    assert.match(rejected.stderr, pattern);
+  }
+  const custom = write('observation-custom-outcome.json', JSON.stringify({ ...validObservation, outcome: 'reviewed', failures: 1 }));
+  assert.equal(spawnSync(process.execPath, [cli, 'observe', '--observation', custom], { encoding: 'utf8' }).status, 0);
+  const legacyNoConfig = spawnSync(process.execPath, [cli, 'route', '--request', req, '--ledger', ledger, '--playbook', pb, '--policy', 'legacy'], { encoding: 'utf8', cwd: tmp });
+  assert.equal(legacyNoConfig.status, 0, legacyNoConfig.stderr);
+  assert.equal(JSON.parse(legacyNoConfig.stdout).policy, 'legacy');
   const replayed = spawnSync(process.execPath, [cli, 'replay', '--scenario', scenario, '--ledger', ledger, '--playbook', pb, '--config', cfg], { encoding: 'utf8' });
   assert.equal(replayed.status, 0, replayed.stderr);
   assert.equal(JSON.parse(replayed.stdout).scenarios, 2);
+});
+
+test('versioned route and replay goldens are byte-identical and document the benchmark hash', () => {
+  const cli = path.join(ROOT, 'bin/tierdecay.js');
+  const common = ['--ledger', path.join(__dirname, 'fixtures/measured-ledger.md'), '--playbook', path.join(__dirname, 'fixtures/legacy-playbook.md'), '--config', path.join(ROOT, 'benchmarks/synthetic-v1.config.json'), '--policy', 'shadow'];
+  const routed = spawnSync(process.execPath, [cli, 'route', '--request', path.join(__dirname, 'fixtures/golden-request.json'), ...common], { encoding: 'utf8' });
+  const replayed = spawnSync(process.execPath, [cli, 'replay', '--scenario', path.join(ROOT, 'benchmarks/synthetic-v1.jsonl'), ...common], { encoding: 'utf8' });
+  assert.equal(routed.status, 0, routed.stderr);
+  assert.equal(replayed.status, 0, replayed.stderr);
+  assert.equal(routed.stdout, fixture('golden-shadow-route.json'));
+  assert.equal(replayed.stdout, fixture('golden-shadow-replay.json'));
+  const hash = JSON.parse(replayed.stdout).finalStateHash;
+  assert.match(fs.readFileSync(path.join(ROOT, 'benchmarks/README.md'), 'utf8'), new RegExp(hash));
 });
 
 process.on('exit', () => {
