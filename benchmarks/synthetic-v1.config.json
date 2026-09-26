@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "calibrated": true,
+  "bindingEpoch": "synthetic-v1",
+  "costUnit": "synthetic-unit",
+  "confidenceDelta": 0.05,
+  "costCap": 10,
+  "incidentCap": 10,
+  "failurePenalty": 3,
+  "escalationPenalty": 2,
+  "riskWeight": 2,
+  "riskExposure": [0, 1, 2, 4],
+  "minSamples": 3,
+  "margin": 0.1,
+  "failureThresholds": [0.5, 0.4, 0.2, 0],
+  "probeOverhead": 0.5,
+  "minimumVoi": 0.1,
+  "maxProbeRisk": 2,
+  "maximumFailures": 4,
+  "maximumEscalations": 2
+}

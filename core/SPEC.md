@@ -61,7 +61,9 @@ implements, T3 reviews). Tie-breaks: strong tests → down; critical path → up
 - **Class signature**: 2–4 hyphenated tokens, `verb-object-surface`. Reuse
   existing signatures before minting new ones.
 - **Ledger row** (every task): `date | class | predicted | executed | outcome
-  | esc | playbook` (keep the last 50 rows). At ≥3 rows a class enters PRIORS;
+  | esc | playbook` (keep the last 50 rows). A deliberately migrated measured
+  ledger adds all of `obs_id | resource_cost | failures | incident_loss | risk
+  | epoch`; never mix partial measured rows into either layout. At ≥3 rows a class enters PRIORS;
   the posterior overrides the rubric in both directions (2 escalations raise a
   default). One **escalation** = 2 failed acceptance runs at a tier ⇒ retry one
   tier up, both failure reports attached verbatim (§2 step 5).
@@ -92,3 +94,24 @@ Model tiering happens through whatever the CLI offers — per-session model
 flags, `/model` commands, profiles, or architect/editor splits. Where no
 switching exists, successful playbook hits may still reduce turns and context;
 net savings depend on fully loaded costs, including failures and escalations.
+
+## 7. Deterministic routing advisor (optional)
+
+`bin/tierdecay.js` is the reference, zero-runtime-dependency advisor. Markdown
+remains authoritative; the engine is read-only and `observe` only prints a row
+for the orchestrator to apply. Its default `shadow` policy always keeps the
+legacy §2 decision effective. `optimize` is explicit opt-in and requires a
+calibrated economic configuration. See `ROUTER.md` and `schemas/`.
+
+Safety precedes optimization: request risk must exactly equal the rubric risk;
+critical or risk-3 work is T3; T0 is never an execution result. Quarantine and
+sticky floors apply to the whole exact class, even without a referenced ID. A
+lower candidate requires an explicitly referenced live playbook and is at most
+one tier below provenance. Statistical evidence never crosses exact
+`(class, risk, epoch, executed)` cells. Legacy rows remain readable but are not
+measurements. State ambiguity or invalid numeric data is an error, not a guess.
+
+The advisor is deterministic: no network, clock, randomness, locale ordering,
+or state writes; observations sort by `obs_id`; canonical parsed state is
+SHA-256 hashed. Replay requires potential outcomes for all executable tiers
+before reporting causal regret. Synthetic fixtures are not real benchmarks.

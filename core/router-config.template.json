@@ -1,0 +1,21 @@
+{
+  "enabled": false,
+  "calibrated": false,
+  "bindingEpoch": null,
+  "costUnit": null,
+  "confidenceDelta": null,
+  "costCap": null,
+  "incidentCap": null,
+  "failurePenalty": null,
+  "escalationPenalty": null,
+  "riskWeight": null,
+  "riskExposure": null,
+  "minSamples": null,
+  "margin": null,
+  "failureThresholds": null,
+  "probeOverhead": null,
+  "minimumVoi": null,
+  "maxProbeRisk": null,
+  "maximumFailures": null,
+  "maximumEscalations": null
+}

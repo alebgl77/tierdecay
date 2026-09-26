@@ -160,6 +160,31 @@ realized cumulative cost above the table. TierDecay has no published benchmark.
 Health metric: the `executed` column of your ledger should drift toward T1
 over time for recurring classes. **That drift is the product.**
 
+## Deterministic router (v0.3 development)
+
+TierDecay now includes an optional local Node.js advisor over the same
+Markdown ledger and playbook. It has no runtime dependencies, network calls,
+daemon, clock, random source, or state-writing capability. The default
+`shadow` policy calculates recommendations while keeping the established
+protocol decision effective; `optimize` is never the default and must be
+explicitly enabled with a calibrated economic configuration.
+
+```bash
+node bin/tierdecay.js route \
+  --request request.json \
+  --ledger .tierdecay/ledger.md \
+  --playbook .tierdecay/playbook.md \
+  --config .tierdecay/router-config.json \
+  --policy shadow
+```
+
+The CLI also validates observation rows and performs sequential, reproducible
+replay when every executable tier has an explicit potential outcome. See the
+[router contract](core/ROUTER.md), [JSON schemas](core/schemas/), and the
+[synthetic replay fixture](benchmarks/README.md). The synthetic data is a
+regression fixture, not evidence from real workloads. **TierDecay still has no
+published real-workload benchmark and makes no universal savings claim.**
+
 ## Why it doesn't rot
 
 Self-modifying instruction systems have one canonical failure mode:
@@ -197,9 +222,10 @@ with the release version you downloaded.
 **Prerequisites:** one of the supported CLIs, and `bash` to run the installer —
 already present on macOS and Linux; on **Windows** use Git Bash or WSL. No
 service runtime, package manager, or API key is required. The Claude Code
-adapter alone requires `node` for its local state-write guard hook; the other
-adapters do not. Nothing is installed globally: the installer only copies
-files into the repo you point it at.
+adapter requires `node` for its local state-write guard hook. The optional
+router requires Node.js 18+ for every adapter; the Markdown protocol itself
+does not. Nothing is installed globally: the installer only copies files into
+the repo you point it at.
 
 ```bash
 cd your-project        # the repo you want to equip — NOT the tierdecay checkout

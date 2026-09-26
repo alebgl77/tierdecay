@@ -10,6 +10,7 @@ Never apply anything under QUARANTINE.
 ## Entry format
 ### PB-<n> · <class-signature>
 provenance: T<x> <YYYY-MM> · hits: <k>
+floor: none
 WHEN: <conditions matching a task to this class>
 DO:   <3–10 imperative steps / invariants, order matters>
 VERIFY: <the check that proves it worked>
@@ -20,3 +21,6 @@ recurring class)
 
 ## QUARANTINE
 (entries that caused an acceptance failure — revise before reuse)
+
+`floor` may be `none` or T1–T3 and records the failed probe tier. It cannot be
+above provenance. A quarantined entry is never a lower-tier candidate.
