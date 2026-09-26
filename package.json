@@ -1,0 +1,17 @@
+{
+  "name": "tierdecay",
+  "version": "0.3.0",
+  "description": "Deterministic local routing advisor for TierDecay markdown state",
+  "license": "MIT",
+  "private": true,
+  "type": "commonjs",
+  "bin": {
+    "tierdecay": "bin/tierdecay.js"
+  },
+  "scripts": {
+    "test": "node tests/test-router.js && node tests/test-model-policy.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

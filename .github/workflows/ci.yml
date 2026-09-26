@@ -33,8 +33,10 @@ jobs:
       - name: Required files present
         run: |
           set -euo pipefail
-          req=(README.md LICENSE CONTRIBUTING.md CODE_OF_CONDUCT.md \
-               core/SPEC.md core/ledger.template.md core/playbook.template.md install.sh)
+          req=(README.md LICENSE CONTRIBUTING.md CODE_OF_CONDUCT.md package.json \
+               core/SPEC.md core/ROUTER.md core/ledger.template.md \
+               core/playbook.template.md core/router-config.template.json \
+               bin/tierdecay.js install.sh)
           for f in "${req[@]}"; do
             [ -f "$f" ] || { echo "::error::missing required file $f"; exit 1; }
           done
@@ -147,6 +149,7 @@ jobs:
           bash tests/test-routing-order.sh
           bash tests/test-guard.sh
           node tests/test-model-policy.js
+          node tests/test-router.js
 
   conformance:
     name: Protocol conformance

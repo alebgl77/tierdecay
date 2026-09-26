@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tierdecay.dev/schemas/scenario.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "request", "outcomes"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "date": { "type": "string" },
+    "request": { "$ref": "request.schema.json" },
+    "outcomes": {
+      "type": "object", "additionalProperties": false,
+      "required": ["T1", "T2", "T3"],
+      "properties": {
+        "T1": { "$ref": "#/$defs/outcome" }, "T2": { "$ref": "#/$defs/outcome" }, "T3": { "$ref": "#/$defs/outcome" }
+      }
+    }
+  },
+  "$defs": {
+    "outcome": {
+      "type": "object", "additionalProperties": false,
+      "required": ["resourceCost", "failures", "escalations", "incidentLoss"],
+      "properties": {
+        "resourceCost": { "type": "number", "minimum": 0 },
+        "failures": { "type": "integer", "minimum": 0 },
+        "escalations": { "type": "integer", "minimum": 0 },
+        "incidentLoss": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

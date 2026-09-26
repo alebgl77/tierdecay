@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tierdecay.dev/schemas/observation.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["date", "class", "predicted", "executed", "outcome", "escalations", "playbook", "obsId", "resourceCost", "failures", "incidentLoss", "risk", "epoch"],
+  "properties": {
+    "date": { "type": "string", "minLength": 1 },
+    "class": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+){1,3}$" },
+    "predicted": { "enum": ["T1", "T2", "T3"] },
+    "executed": { "enum": ["T1", "T2", "T3"] },
+    "outcome": { "type": "string", "minLength": 1 },
+    "escalations": { "type": "integer", "minimum": 0 },
+    "playbook": { "type": "string" },
+    "obsId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+    "resourceCost": { "type": "number", "minimum": 0 },
+    "failures": { "type": "integer", "minimum": 0 },
+    "incidentLoss": { "type": "number", "minimum": 0 },
+    "risk": { "type": "integer", "minimum": 0, "maximum": 3 },
+    "epoch": { "type": "string", "pattern": "^\\S+$" }
+  }
+}

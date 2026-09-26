@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning][semver].
 
 ## [Unreleased]
 
+### Added
+
+- Optional deterministic local router with `legacy`, safe-default `shadow`,
+  and explicit `optimize` policies; zero runtime dependencies and Markdown as
+  the source of truth.
+- Strict request/observation/decision/scenario schemas, exact-cell bounded
+  statistics, fully loaded scoring, conservative one-step VOI, and fail-closed
+  quarantine/floor handling.
+- Read-only `route`, row-emitting `observe`, and sequential `replay` CLI
+  commands with canonical hashes and explicit incomplete-outcome refusal.
+- Cross-platform algorithmic regression suite and a reproducible synthetic
+  fixture. No real-workload benchmark or universal savings claim is implied.
+
+### Changed
+
+- Release archives ship the router and schemas. The installer additively ships
+  its documentation and a disabled/null configuration without overwriting
+  existing local state.
+
 ## [0.2.1] - 2026-09-03
 
 ### Changed

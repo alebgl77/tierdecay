@@ -5,7 +5,7 @@
 # Bash (not strict POSIX): uses BASH_SOURCE and arrays.
 set -euo pipefail
 
-VERSION="0.2.1"
+VERSION="0.3.0"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 DEST="$(pwd -P)"
 
@@ -377,6 +377,15 @@ seed_state() {
   copy_safe "$SRC/core/SPEC.md" "$DEST/.tierdecay/PROTOCOL.md"
   # Ship the tier->model bindings: the one file to edit when a model ships.
   copy_safe "$SRC/core/MODELS.md" "$DEST/.tierdecay/MODELS.md"
+  install_router
+}
+
+install_router() {
+  # Keep the runtime in the verified TierDecay distribution. Only its contract
+  # and disabled local calibration are installed, additively and without
+  # overwriting existing project state.
+  copy_safe "$SRC/core/ROUTER.md" "$DEST/.tierdecay/ROUTER.md"
+  copy_safe "$SRC/core/router-config.template.json" "$DEST/.tierdecay/router-config.json"
 }
 
 detect() {
@@ -403,6 +412,8 @@ preflight_state_paths() {
   assert_safe_destination "$DEST/.tierdecay/playbook.md"
   assert_safe_destination "$DEST/.tierdecay/PROTOCOL.md"
   assert_safe_destination "$DEST/.tierdecay/MODELS.md"
+  assert_safe_destination "$DEST/.tierdecay/ROUTER.md"
+  assert_safe_destination "$DEST/.tierdecay/router-config.json"
 }
 
 preflight_install_paths() {
@@ -412,7 +423,7 @@ preflight_install_paths() {
   case "$TARGET" in
     claude)
       assert_safe_destination "$DEST/CLAUDE.md"
-      assert_safe_destination "$DEST/.tierdecay/MODELS.md"
+      preflight_state_paths
       while IFS= read -r -d '' f; do
         rel="${f#"$SRC/adapters/claude-code/.claude/"}"
         assert_safe_destination "$DEST/.claude/$rel"
@@ -641,6 +652,7 @@ case "$TARGET" in
     # The tier->model bindings live at the same path for every adapter, so
     # CLAUDE.md can reference .tierdecay/MODELS.md unconditionally.
     copy_safe "$SRC/core/MODELS.md" "$DEST/.tierdecay/MODELS.md"
+    install_router
     say "installed .claude/ (agents, skills, hooks, settings, ledger — existing files preserved)"
     ;;
   agents)

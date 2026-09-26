@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tierdecay.dev/schemas/decision.schema.json",
+  "type": "object",
+  "required": ["schemaVersion", "policy", "legacy", "recommended", "effective", "warnings", "stateHash"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "policy": { "enum": ["legacy", "shadow", "optimize"] },
+    "legacy": { "$ref": "#/$defs/route" },
+    "recommended": { "$ref": "#/$defs/route" },
+    "effective": { "$ref": "#/$defs/route" },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "stateHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "$defs": {
+    "route": {
+      "type": "object",
+      "required": ["tier", "action", "reason"],
+      "properties": { "tier": { "enum": ["T1", "T2", "T3"] }, "action": { "type": "string" }, "reason": { "type": "string" } }
+    }
+  }
+}
