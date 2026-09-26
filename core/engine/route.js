@@ -92,17 +92,39 @@ function exactCell(ledger, request) {
 }
 
 function safeIncumbent(incumbent, cell, request, config) {
-  const all = {};
+  const statistics = {};
+  const safeTiers = [];
+
   for (let number = TIER_NUMBER[incumbent]; number <= 3; number += 1) {
     const tier = NUMBER_TIER[number];
     const stats = tierStatistics(cell, tier, config);
-    if (stats) all[tier] = stats;
+    if (stats) statistics[tier] = stats;
     if (stats && stats.n >= config.minSamples
         && stats.failureUpper <= config.failureThresholds[request.risk]) {
-      return { tier, safe: true, reason: tier === incumbent ? 'incumbent-safe' : 'failure-upper-bound', statistics: all };
+      safeTiers.push(tier);
     }
   }
-  return { tier: 'T3', safe: false, reason: 'no-observed-safe-tier', statistics: all };
+
+  if (safeTiers.length === 0) {
+    return { tier: 'T3', safe: false, reason: 'no-observed-safe-tier', statistics };
+  }
+
+  let selected = safeTiers[0];
+  let reason = selected === incumbent ? 'incumbent-safe' : 'failure-upper-bound';
+
+  for (const candidateTier of safeTiers.slice(1)) {
+    const current = statistics[selected];
+    const candidate = statistics[candidateTier];
+    const dominates = ensureFinite(candidate.upper + config.margin, 'promotion comparison') < current.lower;
+    const tie = candidate.mean === current.mean;
+
+    if (dominates || tie) {
+      selected = candidateTier;
+      reason = dominates ? 'higher-tier-dominates' : 'higher-tier-tie';
+    }
+  }
+
+  return { tier: selected, safe: true, reason, statistics };
 }
 
 function optimizedRoute(request, ledger, playbook, config, legacy, resolved) {

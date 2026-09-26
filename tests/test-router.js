@@ -56,6 +56,21 @@ function observations({ count = 100, risk = 1, epoch = 'bindings-a', lowerCost =
   return result;
 }
 
+function tierObservations({ tier, count = 500, risk = 1, epoch = 'bindings-a', cost = 1, failures = 0, prefix = tier.toLowerCase() }) {
+  const result = [];
+  for (let i = 0; i < count; i += 1) {
+    const failureCount = typeof failures === 'function' ? failures(i) : failures;
+    result.push({
+      date: '2026-09-20', class: 'add-adapter-cli', predicted: tier, executed: tier,
+      outcome: failureCount ? 'fail' : 'pass', escalations: 0, playbook: 'PB-1',
+      obsId: `${prefix}-${String(i).padStart(4, '0')}`,
+      resourceCost: typeof cost === 'function' ? cost(i) : cost, failures: failureCount,
+      incidentLoss: 0, risk, epoch
+    });
+  }
+  return result;
+}
+
 function stateWith(rows) {
   return { priors: [], legacy: [], observations: [...rows].sort((a, b) => a.obsId < b.obsId ? -1 : 1) };
 }
@@ -108,6 +123,16 @@ test('legacy seven-column ledger remains valid but has no measurements', () => {
   const ledger = legacyLedger();
   assert.equal(ledger.legacy.length, 2);
   assert.equal(ledger.observations.length, 0);
+});
+
+test('legacy dates are opaque non-empty text and remain unchanged', () => {
+  const ledger = parseLedger(fixture('legacy-ledger.md').replace('| 2026-09-20 |', '| 2026-09 |'));
+  assert.equal(ledger.legacy[0].date, '2026-09');
+});
+
+test('empty legacy dates are rejected while measured dates remain ISO', () => {
+  throws(() => parseLedger(fixture('legacy-ledger.md').replace('| 2026-09-20 |', '|  |')), /date must not be empty/);
+  throws(() => parseLedger(fixture('measured-ledger.md').replace('| 2026-09-20 |', '| 2026-09 |')), /date must be a valid YYYY-MM-DD date/);
 });
 
 test('partial measured row is rejected', () => {
@@ -241,6 +266,123 @@ test('ties choose the higher tier', () => {
   const ledger = stateWith(observations({ count: 200, lowerCost: 5, incumbentCost: 5 }));
   const result = route({ request: request({ horizon: 20 }), ledger, playbook: playbook(), config: config({ minSamples: 200, probeOverhead: 0, minimumVoi: 0 }), policy: 'optimize' });
   assert.equal(result.effective.tier, 'T2');
+});
+
+test('statistically dominant safe higher tier promotes before descent', () => {
+  const rows = [
+    ...tierObservations({ tier: 'T2', cost: 9 }),
+    ...tierObservations({ tier: 'T3', cost: 1 })
+  ];
+  const result = route({ request: request(), ledger: stateWith(rows), playbook: playbook(), config: config({ minSamples: 500 }), policy: 'optimize' });
+  assert.equal(result.effective.tier, 'T3');
+  assert.equal(result.effective.action, 'promotion');
+  assert.equal(result.effective.reason, 'higher-tier-dominates');
+});
+
+test('unsafe T1 promotes through safe T2 to dominant safe T3', () => {
+  const rows = [
+    ...tierObservations({ tier: 'T1', cost: 1, failures: 1 }),
+    ...tierObservations({ tier: 'T2', cost: 9 }),
+    ...tierObservations({ tier: 'T3', cost: 1 })
+  ];
+  const lowRequest = request({ playbook: undefined, rubric: { ambiguity: 0, reasoning: 0, blastRadius: 0, riskSurface: 1 } });
+  const result = route({ request: lowRequest, ledger: stateWith(rows), playbook: playbook(), config: config({ minSamples: 500 }), policy: 'optimize' });
+  assert.equal(result.effective.tier, 'T3');
+  assert.equal(result.effective.reason, 'higher-tier-dominates');
+});
+
+test('unsafe cheaper middle tier is skipped between safe tiers', () => {
+  const rows = [
+    ...tierObservations({ tier: 'T1', cost: 9 }),
+    ...tierObservations({ tier: 'T2', cost: 0.5, failures: 1 }),
+    ...tierObservations({ tier: 'T3', cost: 1 })
+  ];
+  const lowRequest = request({ playbook: undefined, rubric: { ambiguity: 0, reasoning: 0, blastRadius: 0, riskSurface: 1 } });
+  const result = route({ request: lowRequest, ledger: stateWith(rows), playbook: playbook(), config: config({ minSamples: 500 }), policy: 'optimize' });
+  assert.equal(result.effective.tier, 'T3');
+  assert.equal(result.effective.reason, 'higher-tier-dominates');
+});
+
+test('unsafe cheaper higher tier cannot displace a safe incumbent', () => {
+  const rows = [
+    ...tierObservations({ tier: 'T2', cost: 9 }),
+    ...tierObservations({ tier: 'T3', cost: 1, failures: 1 })
+  ];
+  const result = route({ request: request({ playbook: undefined }), ledger: stateWith(rows), playbook: playbook(), config: config({ minSamples: 500 }), policy: 'optimize' });
+  assert.equal(result.effective.tier, 'T2');
+  assert.notEqual(result.effective.action, 'promotion');
+});
+
+test('equal safe higher-tier mean promotes with deterministic tie-break', () => {
+  const rows = [
+    ...tierObservations({ tier: 'T2', cost: 5 }),
+    ...tierObservations({ tier: 'T3', cost: 5 })
+  ];
+  const result = route({ request: request({ playbook: undefined }), ledger: stateWith(rows), playbook: playbook(), config: config({ minSamples: 500 }), policy: 'optimize' });
+  assert.equal(result.effective.tier, 'T3');
+  assert.equal(result.effective.reason, 'higher-tier-tie');
+});
+
+test('under-sampled higher tier cannot promote economically', () => {
+  const rows = [
+    ...tierObservations({ tier: 'T2', cost: 9 }),
+    ...tierObservations({ tier: 'T3', count: 499, cost: 1 })
+  ];
+  const result = route({ request: request({ playbook: undefined }), ledger: stateWith(rows), playbook: playbook(), config: config({ minSamples: 500 }), policy: 'optimize' });
+  assert.equal(result.effective.tier, 'T2');
+  assert.notEqual(result.effective.action, 'promotion');
+});
+
+test('overlapping bounds prevent higher-tier promotion when means differ', () => {
+  const rows = [
+    ...tierObservations({ tier: 'T2', cost: 9 }),
+    ...tierObservations({ tier: 'T3', cost: 8.9 })
+  ];
+  const cfg = config({ minSamples: 500 });
+  const incumbent = tierStatistics(rows, 'T2', cfg);
+  const candidate = tierStatistics(rows, 'T3', cfg);
+  assert.notEqual(candidate.mean, incumbent.mean);
+  assert.ok(candidate.upper + cfg.margin >= incumbent.lower);
+  const result = route({ request: request({ playbook: undefined }), ledger: stateWith(rows), playbook: playbook(), config: cfg, policy: 'optimize' });
+  assert.equal(result.effective.tier, 'T2');
+  assert.notEqual(result.effective.action, 'promotion');
+});
+
+test('economic selection never descends below its incumbent', () => {
+  const rows = [
+    ...tierObservations({ tier: 'T1', cost: 1 }),
+    ...tierObservations({ tier: 'T2', cost: 9 })
+  ];
+  const result = route({ request: request({ playbook: undefined }), ledger: stateWith(rows), playbook: playbook(), config: config({ minSamples: 500 }), policy: 'optimize' });
+  assert.equal(result.effective.tier, 'T2');
+  assert.notEqual(result.effective.action, 'promotion');
+});
+
+test('higher-tier economic promotion is invariant to observation permutation', () => {
+  const rows = [
+    ...tierObservations({ tier: 'T2', cost: (i) => 8.8 + (i % 3) / 10 }),
+    ...tierObservations({ tier: 'T3', cost: (i) => 0.8 + (i % 3) / 10 })
+  ];
+  const input = { request: request(), playbook: playbook(), config: config({ minSamples: 500 }), policy: 'optimize' };
+  const a = route({ ...input, ledger: { priors: [], legacy: [], observations: rows } });
+  const b = route({ ...input, ledger: { priors: [], legacy: [], observations: [...rows].reverse() } });
+  assert.deepEqual(a, b);
+  assert.equal(a.effective.reason, 'higher-tier-dominates');
+});
+
+test('higher-tier economic promotion is invariant to homogeneous scaling', () => {
+  const rows = [
+    ...tierObservations({ tier: 'T2', cost: 9 }),
+    ...tierObservations({ tier: 'T3', cost: 1 })
+  ];
+  const base = config({ minSamples: 500 });
+  const scaled = config({ minSamples: 500, costCap: 100, incidentCap: 100, failurePenalty: 30, escalationPenalty: 20, riskWeight: 20, margin: 1, probeOverhead: 5, minimumVoi: 1 });
+  const scaledRows = rows.map((row) => ({ ...row, resourceCost: row.resourceCost * 10, incidentLoss: row.incidentLoss * 10 }));
+  const a = route({ request: request(), ledger: stateWith(rows), playbook: playbook(), config: base, policy: 'optimize' });
+  const b = route({ request: request(), ledger: stateWith(scaledRows), playbook: playbook(), config: scaled, policy: 'optimize' });
+  assert.equal(a.effective.tier, b.effective.tier);
+  assert.equal(a.effective.action, b.effective.action);
+  assert.equal(a.effective.reason, b.effective.reason);
 });
 
 test('known unsafe incumbent promotes to first observed safe higher tier', () => {
@@ -377,6 +519,21 @@ test('replay is deterministic and reports all cumulative metrics', () => {
   for (const decision of a.decisions) {
     assert.equal(decision.predicted, decision.tier);
     assert.equal(decision.executed, decision.tier);
+  }
+});
+
+test('missing replay date is byte-identical to the deterministic epoch date', () => {
+  const scenario = JSON.parse(fixture('adversarial-replay.jsonl').split('\n')[0]);
+  delete scenario.date;
+  const withEpochDate = { ...scenario, date: '1970-01-01' };
+  const run = (value) => replay({ jsonl: JSON.stringify(value), ledger: measuredLedger(), playbook: playbook(), config: config(), policy: 'shadow' });
+  assert.equal(stableStringify(run(scenario)), stableStringify(run(withEpochDate)));
+});
+
+test('replay rejects invalid or non-string dates', () => {
+  const scenario = JSON.parse(fixture('adversarial-replay.jsonl').split('\n')[0]);
+  for (const date of ['2026-02-30', '', 19700101, ['1970-01-01']]) {
+    throws(() => replay({ jsonl: JSON.stringify({ ...scenario, date }), ledger: measuredLedger(), playbook: playbook(), config: config(), policy: 'shadow' }), /date must be a valid YYYY-MM-DD date/);
   }
 });
 

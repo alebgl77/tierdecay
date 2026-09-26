@@ -69,7 +69,9 @@ Measured ledger rows extend the seven legacy columns with:
 All six fields are required together. Numerical evidence is attributed to the
 tier actually `executed`; `predicted` remains audit metadata. Replay records the
 applied recommendation in both fields. Legacy seven-column ledgers remain
-valid, but are never silently converted into numerical measurements.
+valid, but are never silently converted into numerical measurements. Their
+historical `date` field is opaque and only required to be non-empty; measured
+rows require a valid ISO `YYYY-MM-DD` date.
 
 ## Statistical cells and score
 
@@ -116,12 +118,15 @@ for T1, T2, and T3; otherwise exit code 4 refuses causal comparison. The report
 contains cumulative fully loaded loss, raw resource cost, failures,
 escalations, incidents, probes, promotions, refusals, regret against the best
 provided potential outcome, the legacy loss, decisions, and a final SHA-256
-state hash.
+state hash. A replay scenario date must be an ISO `YYYY-MM-DD` string. When it
+is absent, replay uses the deterministic date `1970-01-01` rather than reading
+the clock.
 
 Caps apply only to observations in the active `bindingEpoch`; lexical types,
 non-negativity, finiteness, safe counters, and unique IDs are validated across
-all epochs. `observe` requires strict JSON types and a valid ISO date. Exact
-`pass` requires zero failures; exact `fail` requires at least one; other
+all epochs. `observe` requires strict JSON types and a valid ISO
+`YYYY-MM-DD` date. Exact `pass` requires zero failures; exact `fail` requires
+at least one; other
 non-empty outcome labels remain allowed. Legacy routing does not load a router
 configuration.
 

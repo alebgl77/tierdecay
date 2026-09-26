@@ -117,7 +117,8 @@ function parseLedger(text) {
       escalations: uint(row[5], 'esc'),
       playbook: row[6]
     };
-    if (!isIsoDate(common.date)) throw new StateError('date must be a valid YYYY-MM-DD date');
+    if (!common.date) throw new StateError('date must not be empty');
+    if (isMeasuredTable && !isIsoDate(common.date)) throw new StateError('date must be a valid YYYY-MM-DD date');
     if (!common.outcome) throw new StateError('outcome must not be empty');
     if (!CLASS_RE.test(common.class)) throw new StateError(`invalid class signature: ${common.class}`);
     if (!isMeasuredTable) {

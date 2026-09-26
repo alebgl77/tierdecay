@@ -3,6 +3,9 @@
 const { canonicalHash, serialized } = require('./canonical');
 const { ValidationError, validateConfig, metricLoss, ensureFinite } = require('./statistics');
 const { route, validateRequest } = require('./route');
+const { isIsoDate } = require('./markdown');
+
+const DEFAULT_REPLAY_DATE = '1970-01-01';
 
 class IncompleteReplayError extends Error {
   constructor(message) {
@@ -56,8 +59,9 @@ function replay({ jsonl, ledger, playbook, config, policy = 'shadow' }) {
     const allowed = new Set(['id', 'date', 'request', 'outcomes']);
     for (const key of Object.keys(scenario)) if (!allowed.has(key)) throw new ValidationError(`scenario ${index + 1} has unknown property: ${key}`);
     if (!/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(scenario.id)) throw new ValidationError(`scenario ${index + 1} id is invalid`);
-    if (scenario.date !== undefined && (typeof scenario.date !== 'string' || !scenario.date || /[|\r\n]/.test(scenario.date))) {
-      throw new ValidationError(`scenario ${scenario.id} date is invalid`);
+    const observationDate = scenario.date === undefined ? DEFAULT_REPLAY_DATE : scenario.date;
+    if (typeof observationDate !== 'string' || !isIsoDate(observationDate)) {
+      throw new ValidationError(`scenario ${scenario.id} date must be a valid YYYY-MM-DD date`);
     }
     if (seen.has(scenario.id)) throw new ValidationError(`duplicate replay id: ${scenario.id}`);
     seen.add(scenario.id);
@@ -82,7 +86,7 @@ function replay({ jsonl, ledger, playbook, config, policy = 'shadow' }) {
     if (decision.effective.action === 'promotion' || decision.effective.action === 'safety') totals.promotions += 1;
     if (decision.effective.action === 'refusal') totals.refusals += 1;
     working.observations.push({
-      date: scenario.date || 'replay', class: request.class, predicted: chosenTier,
+      date: observationDate, class: request.class, predicted: chosenTier,
       executed: chosenTier, outcome: chosen.failures > 0 ? 'fail' : 'pass', escalations: chosen.escalations,
       playbook: request.playbook || '—', obsId: scenario.id, resourceCost: chosen.resourceCost,
       failures: chosen.failures, incidentLoss: chosen.incidentLoss, risk: request.risk, epoch: request.epoch
