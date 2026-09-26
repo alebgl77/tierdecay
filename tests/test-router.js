@@ -279,6 +279,28 @@ test('statistically dominant safe higher tier promotes before descent', () => {
   assert.equal(result.effective.reason, 'higher-tier-dominates');
 });
 
+test('safe non-dominant T2 does not stop scan before dominant T3', () => {
+  const rows = [
+    ...tierObservations({ tier: 'T1', cost: 9 }),
+    ...tierObservations({ tier: 'T2', cost: 8.9 }),
+    ...tierObservations({ tier: 'T3', cost: 1 })
+  ];
+  const cfg = config({ minSamples: 500 });
+  const selected = tierStatistics(rows, 'T1', cfg);
+  const middle = tierStatistics(rows, 'T2', cfg);
+  const higher = tierStatistics(rows, 'T3', cfg);
+  for (const stats of [selected, middle, higher]) {
+    assert.equal(stats.n, cfg.minSamples);
+    assert.ok(stats.failureUpper <= cfg.failureThresholds[1]);
+  }
+  assert.ok(middle.upper + cfg.margin >= selected.lower);
+  assert.ok(higher.upper + cfg.margin < selected.lower);
+  const lowRequest = request({ playbook: undefined, rubric: { ambiguity: 0, reasoning: 0, blastRadius: 0, riskSurface: 1 } });
+  const result = route({ request: lowRequest, ledger: stateWith(rows), playbook: playbook(), config: cfg, policy: 'optimize' });
+  assert.equal(result.effective.tier, 'T3');
+  assert.equal(result.effective.reason, 'higher-tier-dominates');
+});
+
 test('unsafe T1 promotes through safe T2 to dominant safe T3', () => {
   const rows = [
     ...tierObservations({ tier: 'T1', cost: 1, failures: 1 }),

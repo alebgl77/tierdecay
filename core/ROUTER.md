@@ -103,11 +103,16 @@ risk threshold. Otherwise the conservative one-step exploration proxy is:
 - (max(0, upper(lower)-mean(incumbent)) + probeOverhead)
 ```
 
-Before descent, the router scans from the incumbent upward and selects the
-first observed tier whose failure upper bound meets the risk threshold. If no
-observed tier qualifies, it fails closed at T3. It can probe only recurring work with horizon at least two, within
-`maxProbeRisk`, and strictly above `minimumVoi`. Ties retain the higher tier.
-No universal savings claim follows from this heuristic.
+Before descent, the router considers only tiers at or above the incumbent; this
+safety and economic selection never descends. A tier is admissible only when
+`n >= minSamples` and its failure upper bound is at or below the threshold for
+the request's risk. The first admissible tier is the safety baseline. If no tier is
+admissible, the router fails closed at T3. It then compares every higher
+admissible tier with the still-selected tier: a candidate replaces it only when
+`candidate.upper + margin < selected.lower`, or when their means are exactly
+equal, in which case the higher tier wins. It can probe only recurring work
+with horizon at least two, within `maxProbeRisk`, and strictly above
+`minimumVoi`. No universal savings claim follows from this heuristic.
 
 ## Replay
 
