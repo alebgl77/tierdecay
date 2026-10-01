@@ -21,9 +21,16 @@ const { serialized } = require('./canonical');
 const { statePaths, loadState, loadConfig } = require('./workspace');
 
 const SERVER = { name: 'tierdecay', version: require('./version').VERSION };
-// Newest first. A client asking for one of these gets it echoed back; any
-// other request is answered with the newest, per the MCP version negotiation.
-const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
+// Both protocol eras, newest first. 2026-07-28 is stateless: no initialize
+// handshake; every request carries its version in params._meta, results carry
+// resultType, and servers must answer server/discover. The older versions use
+// the initialize handshake (Codex, for one, still sends 2025-06-18).
+const MODERN_VERSION = '2026-07-28';
+const LEGACY_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
+const PROTOCOL_VERSIONS = [MODERN_VERSION, ...LEGACY_VERSIONS];
+const META_VERSION = 'io.modelcontextprotocol/protocolVersion';
+const UNSUPPORTED_PROTOCOL_VERSION = -32022;
+const TOOLS_TTL_MS = 3600000;
 
 const INSTRUCTIONS = [
   'TierDecay routes recurring coding-task classes to the cheapest tier that has earned them in this repository.',
@@ -189,31 +196,59 @@ function createServer({ root, overrides = {}, allowAppend = false } = {}) {
     }
   };
 
-  function respond(id, result) { return { jsonrpc: '2.0', id, result }; }
-  function fail(id, code, message) { return { jsonrpc: '2.0', id, error: { code, message } }; }
+  function fail(id, code, message, data) {
+    return { jsonrpc: '2.0', id, error: data === undefined ? { code, message } : { code, message, data } };
+  }
 
   // Returns the response object for a request, or null for a notification.
   function handle(message) {
     if (!message || typeof message !== 'object' || message.jsonrpc !== '2.0' || typeof message.method !== 'string') {
       return fail(message && message.id !== undefined ? message.id : null, -32600, 'Invalid Request');
     }
-    const { id, method, params = {} } = message;
+    const { id, method } = message;
+    const params = message.params && typeof message.params === 'object' ? message.params : {};
     const notification = id === undefined;
     if (notification) return null;
+    // Modern (stateless) requests declare their version in _meta.
+    const meta = params._meta && typeof params._meta === 'object' ? params._meta : {};
+    const declared = meta[META_VERSION];
+    if (declared !== undefined && !PROTOCOL_VERSIONS.includes(declared)) {
+      return fail(id, UNSUPPORTED_PROTOCOL_VERSION, 'Unsupported protocol version', { supported: PROTOCOL_VERSIONS, requested: declared });
+    }
+    const modern = declared === MODERN_VERSION;
+    const respond = (requestId, result, cache) => ({
+      jsonrpc: '2.0',
+      id: requestId,
+      result: modern ? { resultType: 'complete', ...result, ...(cache || {}) } : result
+    });
     switch (method) {
       case 'initialize': {
-        const requested = params && params.protocolVersion;
+        const requested = params.protocolVersion;
         return respond(id, {
-          protocolVersion: PROTOCOL_VERSIONS.includes(requested) ? requested : PROTOCOL_VERSIONS[0],
+          protocolVersion: LEGACY_VERSIONS.includes(requested) ? requested : LEGACY_VERSIONS[0],
           capabilities: { tools: { listChanged: false } },
           serverInfo: { name: SERVER.name, title: 'TierDecay', version: SERVER.version },
           instructions: INSTRUCTIONS
         });
       }
+      case 'server/discover':
+        return {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            resultType: 'complete',
+            supportedVersions: PROTOCOL_VERSIONS,
+            capabilities: { tools: {} },
+            instructions: INSTRUCTIONS,
+            _meta: { 'io.modelcontextprotocol/serverInfo': { name: SERVER.name, title: 'TierDecay', version: SERVER.version } },
+            ttlMs: TOOLS_TTL_MS,
+            cacheScope: 'private'
+          }
+        };
       case 'ping':
         return respond(id, {});
       case 'tools/list':
-        return respond(id, { tools });
+        return respond(id, { tools }, { ttlMs: TOOLS_TTL_MS, cacheScope: 'private' });
       case 'tools/call': {
         const name = params && params.name;
         const tool = tools.find((candidate) => candidate.name === name);
@@ -252,4 +287,4 @@ function serve({ root, overrides, allowAppend, input = process.stdin, output = p
   return new Promise((resolve) => lines.on('close', resolve));
 }
 
-module.exports = { createServer, serve, PROTOCOL_VERSIONS, TOOLS, RECORD_TOOL };
+module.exports = { createServer, serve, PROTOCOL_VERSIONS, LEGACY_VERSIONS, MODERN_VERSION, TOOLS, RECORD_TOOL };

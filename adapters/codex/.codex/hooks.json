@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "apply_patch|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; TIERDECAY_PROJECT_DIR=\"$d\" \"$d/.codex/hooks/tierdecay-guard.sh\" --executors-only",
+            "timeout": 15,
+            "statusMessage": "TierDecay: checking routing-state integrity"
+          }
+        ]
+      }
+    ]
+  }
+}

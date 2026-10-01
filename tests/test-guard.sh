@@ -230,6 +230,11 @@ scoped_cases=(
   '2|heavy executor Bash state reference|{"tool_name":"Bash","agent_type":"tierdecay:heavy-executor","tool_input":{"command":"echo x >> .claude/routing-ledger.md"}}'
   '0|executor ordinary write|{"tool_name":"Write","agent_type":"tierdecay:executor","tool_input":{"file_path":"src/app.py"}}'
   '2|malformed payload fails closed|not json'
+  '2|codex executor patch into state|{"tool_name":"apply_patch","agent_type":"executor","tool_input":{"command":"*** Begin Patch\n*** Update File: .tierdecay/playbook.md\n@@\n-a\n+b\n*** End Patch"}}'
+  '2|codex patch moving a file into state|{"tool_name":"apply_patch","agent_type":"heavy-executor","tool_input":{"input":"*** Begin Patch\n*** Update File: src/a.js\n*** Move to: .claude/x.md\n*** End Patch"}}'
+  '0|codex executor ordinary patch|{"tool_name":"apply_patch","agent_type":"executor","tool_input":{"command":"*** Begin Patch\n*** Add File: src/x.js\n+hi\n*** End Patch"}}'
+  '0|codex main thread patch to state|{"tool_name":"apply_patch","tool_input":{"command":"*** Begin Patch\n*** Update File: .tierdecay/ledger.md\n*** End Patch"}}'
+  '2|codex unknown envelope naming state|{"tool_name":"apply_patch","agent_type":"executor","tool_input":{"weird":"edit .tierdecay/ledger.md"}}'
 )
 for entry in "${scoped_cases[@]}"; do
   expected="${entry%%|*}"

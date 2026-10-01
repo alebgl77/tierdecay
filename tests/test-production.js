@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
-const { createServer, PROTOCOL_VERSIONS } = require('../core/engine/mcp');
+const { createServer, LEGACY_VERSIONS, MODERN_VERSION } = require('../core/engine/mcp');
 const { appendObservation, withLock, MEASURED_HEADER, MEASURED_SEPARATOR } = require('../core/engine/observation');
 const { doctor } = require('../core/engine/doctor');
 const { statePaths } = require('../core/engine/workspace');
@@ -64,14 +64,37 @@ function rpc(server, method, params, id = 1) {
 
 test('MCP initialize negotiates the protocol version and advertises tools', () => {
   const server = createServer({ root: project({ entries: ENTRY }) });
-  for (const version of PROTOCOL_VERSIONS) assert.equal(rpc(server, 'initialize', { protocolVersion: version }).result.protocolVersion, version);
+  for (const version of LEGACY_VERSIONS) assert.equal(rpc(server, 'initialize', { protocolVersion: version }).result.protocolVersion, version);
   const result = rpc(server, 'initialize', { protocolVersion: '1999-01-01' }).result;
-  assert.equal(result.protocolVersion, PROTOCOL_VERSIONS[0]);
+  assert.equal(result.protocolVersion, LEGACY_VERSIONS[0]);
+  assert.equal(result.resultType, undefined, 'legacy results carry no resultType');
   assert.deepEqual(result.capabilities, { tools: { listChanged: false } });
   assert.equal(result.serverInfo.name, 'tierdecay');
   assert.equal(result.serverInfo.version, VERSION);
   assert.equal(server.handle({ jsonrpc: '2.0', method: 'notifications/initialized' }), null);
   assert.deepEqual(rpc(server, 'ping').result, {});
+});
+
+test('MCP 2026-07-28: server/discover, per-request _meta, resultType, cache hints, version errors', () => {
+  const server = createServer({ root: project({ entries: ENTRY }) });
+  const meta = { 'io.modelcontextprotocol/protocolVersion': MODERN_VERSION, 'io.modelcontextprotocol/clientCapabilities': {} };
+  const discovered = rpc(server, 'server/discover', { _meta: meta }).result;
+  assert.equal(discovered.resultType, 'complete');
+  assert.deepEqual(discovered.supportedVersions, [MODERN_VERSION, ...LEGACY_VERSIONS]);
+  assert.deepEqual(discovered.capabilities, { tools: {} });
+  assert.equal(discovered._meta['io.modelcontextprotocol/serverInfo'].name, 'tierdecay');
+  assert.equal(typeof discovered.ttlMs, 'number');
+  assert.equal(discovered.cacheScope, 'private');
+  const listed = rpc(server, 'tools/list', { _meta: meta }).result;
+  assert.equal(listed.resultType, 'complete');
+  assert.ok(listed.tools.length >= 7);
+  assert.equal(listed.cacheScope, 'private');
+  const called = rpc(server, 'tools/call', { _meta: meta, name: 'tierdecay_status', arguments: {} }).result;
+  assert.equal(called.resultType, 'complete');
+  assert.equal(called.structuredContent.summary.classes, 1);
+  const rejected = rpc(server, 'tools/list', { _meta: { ...meta, 'io.modelcontextprotocol/protocolVersion': '1900-01-01' } });
+  assert.equal(rejected.error.code, -32022);
+  assert.deepEqual(rejected.error.data, { supported: [MODERN_VERSION, ...LEGACY_VERSIONS], requested: '1900-01-01' });
 });
 
 test('MCP is read-only by default; the record tool exists only when enabled', () => {
