@@ -97,6 +97,16 @@ precise about which layer you are relying on:
    reference, and TOCTOU changes between inspection and execution, cannot be
    ruled out. VERIFY therefore remains mandatory. For a strong guarantee,
    remove Bash from executor tools or enforce OS-level filesystem isolation.
+   **Plugin variant:** Claude Code ignores `hooks:` frontmatter on plugin
+   agents, so the plugin registers the same guard as a session-wide
+   `PreToolUse` hook with `--executors-only`. It enforces only when the hook
+   payload's `agent_type` names `executor` or `heavy-executor` (optionally
+   `tierdecay:`-prefixed) and passes every other caller. It therefore relies
+   on the client reporting `agent_type` for subagent tool calls; a client that
+   omits it leaves plugin executors unguarded at this layer. A plugin cannot
+   ship permission rules either: add the two `ask` rules yourself
+   (`tierdecay-init` prints them). Run the active-hook smoke check against the
+   plugin too.
 3. **Human:** review state diffs like code (see above), and treat an
    unexpected prompt to approve a state write as a red flag — that prompt IS
    the alarm going off.
