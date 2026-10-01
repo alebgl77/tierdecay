@@ -113,11 +113,15 @@ net savings depend on fully loaded costs, including failures and escalations.
 ## 7. Deterministic routing advisor (optional)
 
 `bin/tierdecay.js` is the reference, zero-runtime-dependency advisor. Markdown
-remains authoritative; the engine is read-only and `observe` only prints a row
-for the orchestrator to apply. `status` lists each class's route and the
+remains authoritative; the engine is read-only except for one write path the
+orchestrator invokes, `observe --append`, which validates a row and inserts it
+into the ledger under a lock, atomically. `doctor` checks the state's health
+for CI; `mcp` serves the same functions to any MCP client (read-only unless
+explicitly started with `--allow-ledger-append true`). `status` lists each class's route and the
 bookkeeping the orchestrator owes (decay due, recertification, missing PRIORS);
 `export` hands the posterior to native routers (Claude Code agents with alias
-and effort, Cursor model/Auto goals, JSON) or compiles live entries into Agent
+and effort, Codex roles with reasoning effort, Antigravity subagents with model
+class, Cursor model/Auto goals, JSON) or compiles live entries into Agent
 Skills; `bench` replays potential outcomes under seeded permutations to measure
 order sensitivity. Its default `shadow` policy always keeps the
 legacy §2 decision effective. `optimize` is explicit opt-in and requires a
@@ -132,6 +136,6 @@ one tier below provenance. Statistical evidence never crosses exact
 measurements. State ambiguity or invalid numeric data is an error, not a guess.
 
 The advisor is deterministic: no network, clock, randomness, locale ordering,
-or state writes; observations sort by `obs_id`; canonical parsed state is
+or state writes outside `observe --append`; observations sort by `obs_id`; canonical parsed state is
 SHA-256 hashed. Replay requires potential outcomes for all executable tiers
 before reporting causal regret. Synthetic fixtures are not real benchmarks.

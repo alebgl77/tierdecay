@@ -30,7 +30,7 @@ conversation model and mode per tier (T3/T2 Planning, T1 Fast).
    order: critical or risk 3 → T3; QUARANTINE entry → T3; live entry from
    another epoch → RECERTIFY at provenance; live entry → PROBE one tier below
    its provenance with the entry quoted verbatim (never below its sticky
-   floor); class in ledger PRIORS (≥3 rows) → its tier; otherwise the rubric —
+   floor); class in ledger PRIORS (≥3 rows) → its tier; otherwise score the rubric —
    ambiguity 0–2, depth 0–3, blast radius 0–2, risk 0–3:
    **0–3 → T1 · 4–6 → T2 · ≥7 or any axis maxed → T3**.
 3. **DISPATCH** — self-contained brief: OBJECTIVE / CONTEXT / FILES /

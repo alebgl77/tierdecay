@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # TierDecay installer — run from the repo you want to equip:
-#   /path/to/tierdecay/install.sh [--dry-run] [--uninstall] <claude|agents|cursor|gemini|aider|cline|goose|windsurf|auto>
+#   /path/to/tierdecay/install.sh [--dry-run] [--uninstall] <claude|codex|antigravity|agents|cursor|gemini|aider|cline|goose|windsurf|auto>
 #   /path/to/tierdecay/install.sh --help
 # Bash (not strict POSIX): uses BASH_SOURCE and arrays.
 set -euo pipefail
@@ -33,10 +33,12 @@ TierDecay installer ${VERSION}
 
 Usage: /path/to/tierdecay/install.sh [options] [target]
 
-Targets:  claude | agents | cursor | gemini | aider | cline | goose | windsurf | auto
-          (auto reads project signals first — .claude, .cursor, .clinerules,
-           .windsurf, .goosehints, GEMINI.md, CONVENTIONS.md, AGENTS.md — then
-           installed CLIs; pass a target explicitly to override)
+Targets:  claude | codex | antigravity | agents | cursor | gemini | aider |
+          cline | goose | windsurf | auto
+          (auto reads project signals first — .claude, .codex, .agents/rules,
+           .agents/agents, .cursor, .clinerules, .windsurf, .goosehints,
+           GEMINI.md, CONVENTIONS.md, AGENTS.md — then installed CLIs; pass a
+           target explicitly to override)
 
 Options:
   --dry-run     print every write that WOULD happen; change nothing
@@ -80,7 +82,7 @@ valid_rel_path() { # valid_rel_path <relative-path>
 
 valid_target() {
   case "$1" in
-    claude|agents|cursor|gemini|aider|cline|goose|windsurf) return 0 ;;
+    claude|codex|antigravity|agents|cursor|gemini|aider|cline|goose|windsurf) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -243,6 +245,33 @@ manifest_mapping_allowed() { # manifest_mapping_allowed <owner> <dest-rel> <sour
     claude:adapters/claude-code/.claude/skills/tier-decay/SKILL.md)
       expected="${source#adapters/claude-code/}"
       ;;
+    codex:adapters/codex/AGENTS.md) expected="AGENTS.md" ;;
+    codex:adapters/codex/.codex/config.toml|\
+    codex:adapters/codex/.codex/hooks.json|\
+    codex:adapters/codex/.codex/hooks/tierdecay-guard.sh|\
+    codex:adapters/codex/.codex/agents/executor.toml|\
+    codex:adapters/codex/.codex/agents/heavy-executor.toml|\
+    codex:adapters/codex/.codex/agents/oracle.toml|\
+    codex:adapters/codex/.codex/agents/scout.toml)
+      expected="${source#adapters/codex/}"
+      ;;
+    antigravity:adapters/antigravity/.agents/rules/tierdecay.md|\
+    antigravity:adapters/antigravity/.agents/mcp_config.json|\
+    antigravity:adapters/antigravity/.agents/agents/executor.md|\
+    antigravity:adapters/antigravity/.agents/agents/heavy-executor.md|\
+    antigravity:adapters/antigravity/.agents/agents/oracle.md|\
+    antigravity:adapters/antigravity/.agents/agents/scout.md)
+      expected="${source#adapters/antigravity/}"
+      ;;
+    # Agent Skills shared by Codex and Antigravity (.agents/skills/).
+    codex:core/agent-skills/tierdecay-routing/SKILL.md|\
+    codex:core/agent-skills/tierdecay-distill/SKILL.md|\
+    codex:core/agent-skills/tierdecay-execution/SKILL.md|\
+    antigravity:core/agent-skills/tierdecay-routing/SKILL.md|\
+    antigravity:core/agent-skills/tierdecay-distill/SKILL.md|\
+    antigravity:core/agent-skills/tierdecay-execution/SKILL.md)
+      expected=".agents/skills/${source#core/agent-skills/}"
+      ;;
     *) return 1 ;;
   esac
   [ "$dest" = "$expected" ] || [ "$dest" = "$expected.tierdecay" ]
@@ -338,11 +367,23 @@ do_cp() { # do_cp <src> <dest> [label]
   return 1
 }
 
+# A file another target installed from the same source (the Agent Skills that
+# Codex and Antigravity share) is co-owned, so uninstalling one target keeps
+# it for the other. A pre-existing identical user file is still never claimed.
+share_ownership() { # share_ownership <src> <dest>
+  [ "$DRY_RUN" = 1 ] && return
+  [ -f "$MANIFEST" ] || return 0
+  local dest_rel="${2#"$DEST"/}"
+  manifest_mapping_allowed "$TARGET" "$dest_rel" "${1#"$SRC"/}" || return 0
+  manifest_owned_by_other "$dest_rel" "$TARGET" || return 0
+  manifest_record "$1" "$2"
+}
+
 # Non-destructive single-file install: identical → skip; existing but
 # different → write a *.tierdecay sidecar WITHOUT overwriting a pending one.
 copy_safe() { # copy_safe <src> <dest>
   if [ ! -e "$2" ] && do_cp "$1" "$2"; then return; fi
-  if cmp -s "$1" "$2"; then return; fi                      # already up to date
+  if cmp -s "$1" "$2"; then share_ownership "$1" "$2"; return; fi  # up to date
   local side="$2.tierdecay"
   if [ ! -e "$side" ]; then
     if [ "$DRY_RUN" = 1 ]; then plan "write $side (for you to merge)"; return; fi
@@ -388,9 +429,16 @@ install_router() {
   copy_safe "$SRC/core/router-config.template.json" "$DEST/.tierdecay/router-config.json"
 }
 
+mcp_hint() {
+  command -v tierdecay >/dev/null 2>&1 && return
+  printf '\nthe MCP config runs "tierdecay mcp"; put the CLI on PATH:\n  npm install -g github:alebgl77/tierdecay#v%s   (or: ln -s %s/bin/tierdecay.js ~/.local/bin/tierdecay)\n' "$VERSION" "$SRC"
+}
+
 detect() {
   # Project signals win over machine-global binaries.
   [ -d "$DEST/.claude" ]        && { echo claude;   return; }
+  [ -d "$DEST/.codex" ]         && { echo codex;    return; }
+  { [ -d "$DEST/.agents/rules" ] || [ -d "$DEST/.agents/agents" ]; } && { echo antigravity; return; }
   [ -d "$DEST/.cursor" ]        && { echo cursor;   return; }
   [ -d "$DEST/.clinerules" ]    && { echo cline;    return; }
   { [ -d "$DEST/.windsurf" ] || [ -d "$DEST/.devin" ]; } && { echo windsurf; return; }
@@ -400,10 +448,12 @@ detect() {
   [ -f "$DEST/AGENTS.md" ]      && { echo agents;   return; }
   # Fall back to machine-global CLI availability.
   command -v claude >/dev/null 2>&1 && { echo claude; return; }
+  command -v codex  >/dev/null 2>&1 && { echo codex;  return; }
+  { command -v agy >/dev/null 2>&1 || command -v antigravity >/dev/null 2>&1; } && { echo antigravity; return; }
   command -v gemini >/dev/null 2>&1 && { echo gemini; return; }
   command -v aider  >/dev/null 2>&1 && { echo aider;  return; }
   command -v goose  >/dev/null 2>&1 && { echo goose;  return; }
-  { command -v codex >/dev/null 2>&1 || command -v opencode >/dev/null 2>&1; } && { echo agents; return; }
+  command -v opencode >/dev/null 2>&1 && { echo agents; return; }
   echo agents # sane default: the universal standard
 }
 
@@ -445,7 +495,25 @@ preflight_install_paths() {
       assert_safe_destination "$DEST/AGENTS.md"
       preflight_state_paths
       ;;
+    codex)
+      assert_safe_destination "$DEST/AGENTS.md"
+      preflight_state_paths
+      preflight_tree "$SRC/adapters/codex/.codex" "$DEST/.codex"
+      preflight_tree "$SRC/core/agent-skills" "$DEST/.agents/skills"
+      ;;
+    antigravity)
+      preflight_state_paths
+      preflight_tree "$SRC/adapters/antigravity/.agents" "$DEST/.agents"
+      preflight_tree "$SRC/core/agent-skills" "$DEST/.agents/skills"
+      ;;
   esac
+}
+
+preflight_tree() { # preflight_tree <src_dir> <dest_dir>
+  local f
+  while IFS= read -r -d '' f; do
+    assert_safe_destination "$2/${f#"$1"/}"
+  done < <(find "$1" -type f -print0)
 }
 
 # --- uninstall (state is sacred; never removed) ----------------------------
@@ -614,7 +682,7 @@ uninstall() {
 }
 
 [ "$TARGET" = "auto" ] && { TARGET="$(detect)"; warn "auto-detected target: $TARGET"; }
-valid_target "$TARGET" || die "unknown target '$TARGET' (claude|agents|cursor|gemini|aider|cline|goose|windsurf|auto)"
+valid_target "$TARGET" || die "unknown target '$TARGET' (claude|codex|antigravity|agents|cursor|gemini|aider|cline|goose|windsurf|auto)"
 [ "$DRY_RUN" = 1 ] && warn "dry run — no files will be changed"
 
 if [ "$UNINSTALL" = 1 ]; then
@@ -630,6 +698,9 @@ fi
 
 if [ "$TARGET" = claude ] && ! command -v node >/dev/null 2>&1; then
   die "Claude target requires node for its fail-closed guard; install Node.js before running TierDecay"
+fi
+if [ "$TARGET" = codex ] && ! command -v node >/dev/null 2>&1; then
+  die "Codex target requires node for its fail-closed guard; install Node.js before running TierDecay"
 fi
 
 preflight_install_paths
@@ -671,6 +742,23 @@ case "$TARGET" in
   cline|goose|windsurf|cursor)
     copy_safe "$SRC/adapters/$TARGET/AGENTS.md" "$DEST/AGENTS.md"
     seed_state
+    ;;
+  codex)
+    copy_safe "$SRC/adapters/codex/AGENTS.md" "$DEST/AGENTS.md"
+    copy_tree "$SRC/adapters/codex/.codex" "$DEST/.codex"
+    copy_tree "$SRC/core/agent-skills" "$DEST/.agents/skills"
+    seed_state
+    say "installed .codex/ (roles, MCP server, guard hook) and .agents/skills/"
+    printf '\nnext:\n  trust the project in Codex, then review and trust the hook with /hooks\n'
+    printf '  optional single-session tiers: cp %s/adapters/codex/profiles/*.config.toml %s/\n' "$SRC" "${CODEX_HOME:-$HOME/.codex}"
+    mcp_hint
+    ;;
+  antigravity)
+    copy_tree "$SRC/adapters/antigravity/.agents" "$DEST/.agents"
+    copy_tree "$SRC/core/agent-skills" "$DEST/.agents/skills"
+    seed_state
+    say "installed .agents/ (always-on rule, subagents, skills, MCP config)"
+    mcp_hint
     ;;
 esac
 

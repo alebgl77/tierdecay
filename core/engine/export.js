@@ -22,16 +22,16 @@ const BINDINGS = Object.freeze({
     T0: { agent: 'scout', model: 'sonnet', effort: 'low' }
   },
   codex: {
-    T3: { profile: 'tierdecay-t3', effort: 'xhigh', model: 'frontier coding model' },
-    T2: { profile: 'tierdecay-t2', effort: 'high', model: 'frontier coding model' },
-    T1: { profile: 'tierdecay-t1', effort: 'medium', model: 'fast coding model' },
-    T0: { profile: 'tierdecay-t0', effort: 'low', model: 'fast coding model' }
+    T3: { role: 'oracle', profile: 'tierdecay-t3', effort: 'xhigh' },
+    T2: { role: 'heavy-executor', profile: 'tierdecay-t2', effort: 'high' },
+    T1: { role: 'executor', profile: 'tierdecay-t1', effort: 'medium' },
+    T0: { role: 'scout', profile: 'tierdecay-t0', effort: 'low' }
   },
   antigravity: {
-    T3: { mode: 'Planning', model: 'frontier model (Pro / Opus class)' },
-    T2: { mode: 'Planning', model: 'strong model' },
-    T1: { mode: 'Fast', model: 'fast model (Flash / Sonnet class)' },
-    T0: { mode: 'Fast', model: 'fast model, read-only' }
+    T3: { subagent: 'oracle', mode: 'Planning', model: 'pro' },
+    T2: { subagent: 'heavy-executor', mode: 'Planning', model: 'pro' },
+    T1: { subagent: 'executor', mode: 'Fast', model: 'flash' },
+    T0: { subagent: 'scout', mode: 'Fast', model: 'flash' }
   },
   cursor: {
     T3: { mode: 'Auto (Intelligence) or your frontier model' },
@@ -86,17 +86,17 @@ function exportClaude(state) {
 function exportCodex(state) {
   const rows = routes(state).map((route) => {
     const binding = BINDINGS.codex[route.tier];
-    return [`\`${route.class}\``, route.tier, `\`codex --profile ${binding.profile}\``, `\`${binding.effort}\``, why(route)];
+    return [`\`${route.class}\``, route.tier, `\`${binding.role}\``, `\`${binding.effort}\``, `\`codex --profile ${binding.profile}\``, why(route)];
   });
-  return `# TierDecay routes (Codex)\n\nRun each task with the profile its tier maps to (profiles: \`.codex/config.toml\` from the TierDecay Codex adapter).\n\n${table(['class', 'tier', 'command', 'reasoning effort', 'why'], rows)}\n\n${FOOTER}\n`;
+  return `# TierDecay routes (Codex)\n\nDelegate each task to the role its tier maps to (\`.codex/agents/\` from the TierDecay Codex adapter); in a single session, use the profile instead (\`profiles/\` in the adapter, copied to \`$CODEX_HOME\`). Roles inherit the session model; tiers differ by reasoning effort.\n\n${table(['class', 'tier', 'role', 'reasoning effort', 'single-session profile', 'why'], rows)}\n\n${FOOTER}\n`;
 }
 
 function exportAntigravity(state) {
   const rows = routes(state).map((route) => {
     const binding = BINDINGS.antigravity[route.tier];
-    return [`\`${route.class}\``, route.tier, binding.mode, binding.model, why(route)];
+    return [`\`${route.class}\``, route.tier, `\`${binding.subagent}\``, `\`${binding.model}\``, binding.mode, why(route)];
   });
-  return `# TierDecay routes (Antigravity)\n\nStart the conversation that carries the task in this agent mode, with this model class.\n\n${table(['class', 'tier', 'agent mode', 'model', 'why'], rows)}\n\n${FOOTER}\n`;
+  return `# TierDecay routes (Antigravity)\n\nDelegate each task to the subagent its tier maps to (\`.agents/agents/\` from the TierDecay Antigravity adapter); without subagents, run the conversation in this mode on this model class.\n\n${table(['class', 'tier', 'subagent', 'model', 'agent mode', 'why'], rows)}\n\n${FOOTER}\n`;
 }
 
 function exportCursor(state) {

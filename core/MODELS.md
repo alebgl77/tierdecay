@@ -1,7 +1,8 @@
 # Model Bindings — the only file that names a model version
 
 Tiers are **roles**, not models. Every adapter, skill, and agent in this repo
-binds T0–T3 by role and by **provider alias**; this file records the current
+binds T0–T3 by role and by **provider alias or model class**, plus an effort
+level where the client exposes one; this file records the current
 binding policy and any deliberately pinned model IDs. Current bindings do not
 depend on a provider version number, price, or plan-availability claim.
 
@@ -65,6 +66,37 @@ the pin in your ledger so the row stays interpretable later.
    re-certified automatically — the router runs them at their provenance tier
    (action `recertify`) until a pass adopts the new epoch — and measured rows
    never cross epochs. `tierdecay status --epoch <new>` lists what is due.
+
+## OpenAI Codex — one session model, four efforts
+
+The Codex adapter binds tiers by **reasoning effort** on the session model,
+the same way the Claude Code adapter separates roles that share an alias:
+
+| Tier | Codex role (`.codex/agents/`) | `model_reasoning_effort` | `sandbox_mode` |
+|---|---|---|---|
+| T3 | orchestrator + `oracle` | `xhigh` | `read-only` |
+| T2 | `heavy-executor` | `high` | `workspace-write` |
+| T1 | `executor` | `medium` | `workspace-write` |
+| T0 | `scout` | `low` | `read-only` |
+
+Roles carry no `model =` line, so they inherit whatever `/model` resolves to
+in the session; a Codex model change is therefore a binding change for every
+tier (new epoch). To pin a model per role, add `model = "<id>"` to the role
+file and record the ID and the date you checked it here. The same no-budget-
+family rule applies: do not bind a tier to a "mini"/"nano" class model.
+
+## Google Antigravity — two model classes
+
+| Tier | Subagent (`.agents/agents/`) | `model` | Conversation mode without subagents |
+|---|---|---|---|
+| T3 | orchestrator + `oracle` | `pro` | Planning |
+| T2 | `heavy-executor` | `pro` | Planning |
+| T1 | `executor` | `flash` | Fast |
+| T0 | `scout` | `flash` | Fast |
+
+`pro` and `flash` are Antigravity's own model classes (`inherit` is the
+third value); the concrete models behind them are Google's choice, so record
+what your build resolves to when you start an epoch.
 
 ## Other providers
 

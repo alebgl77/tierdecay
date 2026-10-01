@@ -107,6 +107,16 @@ precise about which layer you are relying on:
    ship permission rules either: add the two `ask` rules yourself
    (`tierdecay-init` prints them). Run the active-hook smoke check against the
    plugin too.
+   **Codex adapter:** `.codex/hooks.json` registers the same guard with
+   `--executors-only` on `PreToolUse` for `apply_patch` and `Bash`; it parses
+   every file header of an `apply_patch` envelope and resolves each target
+   against the session directory. It shares the plugin variant's dependency
+   on `agent_type` (Codex reports it inside subagents), runs only after you
+   trust it with `/hooks`, and executor roles additionally run in the
+   `workspace-write` sandbox. **Antigravity adapter:** no hook is shipped (its
+   hook input does not yet identify the calling subagent reliably); layers 1
+   and 3, the executors' `sandbox` command policy, and `tierdecay doctor`
+   carry integrity there.
    **MCP server:** `tierdecay mcp` is read-only by default — every tool is
    annotated `readOnlyHint` and none writes. The single write tool,
    `tierdecay_record`, exists only when the server is started with

@@ -126,6 +126,22 @@ Claude Code ignores it for agents loaded from plugins.
   (pass it in the Agent call). Avoid `CLAUDE_CODE_SUBAGENT_MODEL`: it forces
   ALL subagents onto one model and destroys the tiering.
 
+## Optional: the MCP advisor
+
+The orchestrator can query the deterministic engine as MCP tools
+(`tierdecay_route`, `tierdecay_playbook`, `tierdecay_status`, …) instead of
+reading the ledger by hand. With `tierdecay` on PATH
+(`npm install -g github:alebgl77/tierdecay#v0.5.0`):
+
+```bash
+claude mcp add --scope project tierdecay -- tierdecay mcp   # writes .mcp.json for the team
+claude mcp list                                             # tierdecay: ✓ Connected
+```
+
+The server is read-only; MCP tools are visible to every agent in the session,
+so keep `--allow-ledger-append` off here and record rows through the
+orchestrator's normal DISTILL step.
+
 ## Tuning
 - Scout and executor use `sonnet` (`low` / `medium` effort); the main thread,
   oracle, and heavy executor use `opus` (oracle `xhigh`, heavy executor

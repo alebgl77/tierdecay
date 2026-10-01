@@ -153,8 +153,8 @@ function architecture() {
 
   const clients = [
     ['Claude Code', 'plugin · subagents · effort'],
-    ['OpenAI Codex', 'AGENTS.md · profiles · skills'],
-    ['Google Antigravity', 'rules · workflows · modes'],
+    ['OpenAI Codex', 'roles · effort · hooks · MCP'],
+    ['Google Antigravity', 'rules · subagents · MCP'],
     ['Cursor', 'AGENTS.md · Auto goals'],
     ['Gemini CLI', 'GEMINI.md · Pro / Flash'],
     ['Aider · Cline', 'Goose · Windsurf']
@@ -163,8 +163,8 @@ function architecture() {
 
   const surfaces = [
     ['Context files', 'CLAUDE · AGENTS · GEMINI .md', 'surface'],
-    ['Agent Skills', 'SKILL.md per live entry', 'surface'],
-    ['Native rules', 'Antigravity rules · workflows', 'surface'],
+    ['Agent Skills', '.agents/skills · live entries', 'surface'],
+    ['Native roles', 'subagents · rules · hooks', 'surface'],
     ['MCP server', 'stdio · 7 tools (+ record)', 'accent'],
     ['tierdecay CLI', 'Node ≥ 18 · zero deps', 'surface'],
     ['Claude Code plugin', 'guard hook · /tierdecay:init', 'surface']
@@ -238,7 +238,7 @@ function architecture() {
     ['state', 'Versioned Markdown state'], ['danger', 'Integrity boundary'], ['solid', 'Call / read (bus)', 'line'], ['dashed', 'Generate / write / ops', 'line']
   ]));
   parts.push(titleBlock(W, H, 'Reference architecture', 'Sheet 1 / 3'));
-  return svg(W, H, 'TierDecay reference architecture', 'Agent clients (Claude Code, Codex, Antigravity, Cursor, Gemini CLI, others) reach one deterministic engine through context files, Agent Skills, native rules, an MCP server, the CLI, and a Claude Code plugin; the engine reads versioned Markdown state on every call and appends ledger rows under a lock.', parts.join('\n'));
+  return svg(W, H, 'TierDecay reference architecture', 'Agent clients (Claude Code, Codex, Antigravity, Cursor, Gemini CLI, others) reach one deterministic engine through context files, Agent Skills, native roles and rules, an MCP server, the CLI, and a Claude Code plugin; the engine reads versioned Markdown state on every call and appends ledger rows under a lock.', parts.join('\n'));
 }
 
 // --------------------------------------------------------- routing decision

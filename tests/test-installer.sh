@@ -487,6 +487,61 @@ assert_missing "$project/CLAUDE.md"
 assert_missing "$project/.tierdecay"
 ok "Claude requires node before explicit or auto-detected writes"
 
+project="$(new_project no-node-codex)"
+if (cd "$project" && PATH="$no_node_bin" "$BASH" "$INSTALLER" codex) >/dev/null 2>&1; then
+  printf 'FAIL: Codex install without node unexpectedly succeeded\n' >&2
+  exit 1
+fi
+assert_missing "$project/.codex"
+assert_missing "$project/.tierdecay"
+ok "Codex requires node for its guard before any write"
+
+assert_tree_authorized() { # assert_tree_authorized <project> <owner> <src-dir-rel> <dest-dir-rel>
+  local file rel entry
+  while IFS= read -r -d '' file; do
+    rel="${file#"$ROOT/$3/"}"
+    entry="$(printf '%s\t%s\t%s/%s' "$2" "$4$rel" "$3" "$rel")"
+    grep -Fqx "$entry" "$1/.tierdecay/install-manifest.tsv" \
+      || { printf 'FAIL: %s file is missing explicit manifest authorization: %s\n' "$2" "$3/$rel" >&2; exit 1; }
+  done < <(find "$ROOT/$3" -type f -print0)
+}
+
+project="$(new_project codex-antigravity)"
+run_install "$project" codex
+run_install "$project" antigravity
+assert_tree_authorized "$project" codex adapters/codex/.codex .codex/
+assert_tree_authorized "$project" codex core/agent-skills .agents/skills/
+assert_tree_authorized "$project" antigravity adapters/antigravity/.agents .agents/
+assert_tree_authorized "$project" antigravity core/agent-skills .agents/skills/
+cmp -s "$ROOT/adapters/codex/AGENTS.md" "$project/AGENTS.md"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) ;; # no POSIX mode bits to check
+  *) [ -x "$project/.codex/hooks/tierdecay-guard.sh" ] \
+       || { printf 'FAIL: Codex guard hook is not executable after install\n' >&2; exit 1; } ;;
+esac
+ok "every Codex and Antigravity file has explicit manifest authorization"
+
+run_install "$project" --uninstall codex
+assert_missing "$project/AGENTS.md"
+assert_missing "$project/.codex/config.toml"
+assert_exists "$project/.agents/skills/tierdecay-routing/SKILL.md"
+assert_exists "$project/.agents/rules/tierdecay.md"
+run_install "$project" --uninstall antigravity
+assert_missing "$project/.agents/skills/tierdecay-routing/SKILL.md"
+assert_missing "$project/.agents/rules/tierdecay.md"
+assert_exists "$project/.tierdecay/ledger.md"
+ok "Agent Skills shared by Codex and Antigravity are co-owned"
+
+project="$(new_project detect-codex)"
+mkdir -p "$project/.codex"
+run_install "$project" auto
+assert_exists "$project/.codex/agents/executor.toml"
+project="$(new_project detect-antigravity)"
+mkdir -p "$project/.agents/rules"
+run_install "$project" auto
+assert_exists "$project/.agents/rules/tierdecay.md"
+ok "auto-detects Codex and Antigravity projects"
+
 project="$(new_project non-regular-owned-path)"
 run_install "$project" agents
 rm -f "$project/AGENTS.md"

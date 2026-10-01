@@ -6,16 +6,23 @@
 
 **The per-repo learning layer for AI coding model routers. It learns which of *your* recurring task classes can safely run on a cheaper tier — and hands that to the router you already use.**
 
-*Native routers decide from population-wide signals. TierDecay adds the one signal they cannot see: your repo's own history of what passed where.*
+*Native routers decide from population-wide signals. TierDecay adds the one signal they cannot see: your repo's own history of what passed where. One posterior, one deterministic engine, every agent: Claude Code, Codex, Antigravity, Cursor, Gemini CLI, and any MCP client.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![No infra](https://img.shields.io/badge/infra-zero%20%C2%B7%20just%20markdown-blueviolet)](#how-it-works)
 [![CI](https://github.com/alebgl77/tierdecay/actions/workflows/ci.yml/badge.svg)](https://github.com/alebgl77/tierdecay/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/alebgl77/tierdecay?sort=semver)](https://github.com/alebgl77/tierdecay/releases/latest)
 [![GitHub stars](https://img.shields.io/github/stars/alebgl77/tierdecay?style=social)](https://github.com/alebgl77/tierdecay/stargazers)
 <br/>
+[![MCP](https://img.shields.io/badge/MCP-2026--07--28%20%2B%20legacy-6f42c1)](#deterministic-engine-cli-and-mcp-server)
+[![OCI](https://img.shields.io/badge/OCI-distroless%20%C2%B7%20nonroot-2496ED)](docs/PRODUCTION.md)
+[![GitHub Action](https://img.shields.io/badge/GitHub%20Action-doctor%20gate-2088FF)](action.yml)
+[![SBOM](https://img.shields.io/badge/SBOM-CycloneDX-0b7285)](docs/PRODUCTION.md#6-upgrades-and-supply-chain)
+<br/>
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-native-d97757)
-![Codex CLI](https://img.shields.io/badge/Codex%20CLI-AGENTS.md-black)
+![Codex](https://img.shields.io/badge/Codex-native-black)
+![Antigravity](https://img.shields.io/badge/Antigravity-native-4285F4)
 ![Cursor](https://img.shields.io/badge/Cursor-AGENTS.md-lightgrey)
 ![Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-GEMINI.md-4285F4)
 ![Aider](https://img.shields.io/badge/Aider-architect%2Feditor-2ea043)
@@ -55,6 +62,31 @@ about your repo as on task 1.
 TierDecay does not proxy or replace the router. It is three Markdown files, a
 protocol, and an optional deterministic advisor that turns your history into
 per-class routes the router can follow.
+
+## One brain, every agent
+
+<div align="center">
+<img src="docs/diagrams/architecture.svg" alt="Reference architecture: six agent clients reach integration surfaces (context files, Agent Skills, native roles, MCP server, CLI, Claude Code plugin), which call one deterministic engine (route, decay gate, export, status/doctor, bench/replay, observe) over versioned Markdown state; operations layer with OCI image, GitHub Action and tagged releases" width="920" />
+</div>
+
+The same ledger and playbook drive every client; what changes is how each
+tool is told. Where a tool has native subagents, TierDecay binds its tiers to
+them; everywhere else it falls back to phases in one conversation.
+
+| Client | Tier binding | Delegation | Shared skills | State-write guard | MCP advisor | Install |
+|---|---|---|---|---|---|---|
+| **Claude Code** | alias × effort (`opus`/`sonnet`, `low`→`xhigh`) | 4 subagents | ✅ | ✅ `PreToolUse` hook | ✅ `claude mcp add` | plugin or `install.sh claude` |
+| **OpenAI Codex** | session model × `model_reasoning_effort` | 4 roles (`.codex/agents/`) | ✅ `.agents/skills/` | ✅ hook on `apply_patch`/`Bash` | ✅ `.codex/config.toml` | `install.sh codex` |
+| **Google Antigravity** | `pro` / `flash` × Planning / Fast | 4 subagents (`.agents/agents/`) | ✅ `.agents/skills/` | protocol + VERIFY + `doctor` | ✅ `.agents/mcp_config.json` | `install.sh antigravity` |
+| **Cursor** | Auto goals (Cost / Balance / Intelligence) | single agent | `export --format skills` | protocol + VERIFY | ✅ | `install.sh cursor` |
+| **Gemini CLI** | Pro / Flash | single agent | — | protocol + VERIFY | ✅ | `install.sh gemini` |
+| **Aider · Cline · Goose · Windsurf** | architect/editor, Plan/Act, planner, picker | phases | — | protocol + VERIFY | client-dependent | `install.sh <tool>` |
+| **Any MCP client** | — | — | — | read-only by default | ✅ `tierdecay mcp` | `npm i -g github:alebgl77/tierdecay` |
+
+"✅ MCP advisor" means the client can run a local stdio MCP server; TierDecay
+speaks both the stateless `2026-07-28` protocol (`server/discover`,
+per-request version) and the `initialize` handshake of `2025-11-25` and
+earlier, so current and older clients connect without configuration.
 
 ## The idea
 
@@ -207,22 +239,30 @@ realized cumulative cost above the table.
 Health metric: the `executed` column of your ledger should drift toward T1
 over time for recurring classes. **That drift is the product.**
 
-## Deterministic advisor (v0.4)
+## Deterministic engine, CLI, and MCP server
 
-An optional local Node.js advisor reads the same Markdown ledger and playbook.
-No runtime dependencies, network calls, daemon, clock, or random source; it
-never writes the ledger or playbook.
+An optional local Node.js engine reads the same Markdown ledger and playbook.
+No runtime dependencies, network calls, daemon, clock, or random source. Its
+only write path is a validated, locked, atomic ledger append.
 
 ```bash
 tierdecay status                    # per class: route, hits vs. required, what the orchestrator owes
-tierdecay export --format claude    # routing table: class → agent, alias, effort (also: cursor, json)
-tierdecay export --format skills --out .claude/skills   # live entries as Agent Skills
+tierdecay doctor                    # health gate for CI: parse, cap, permissions, epochs; exit 1 on failure
+tierdecay export --format codex     # routing table per client: claude | codex | antigravity | cursor | json
+tierdecay export --format skills --out .agents/skills   # live entries as Agent Skills
 tierdecay route --request request.json --policy shadow  # one decision, with the optimized recommendation
+tierdecay observe --observation row.json --append .tierdecay/ledger.md   # lock · validate · fsync · rename
 tierdecay bench --scenario outcomes.jsonl --config cfg.json --permutations 50   # order robustness
+tierdecay mcp                       # the same logic as MCP tools over stdio (read-only by default)
 ```
 
-(`node bin/tierdecay.js …` from a checkout; the Claude Code plugin puts
-`tierdecay` on the PATH.) `shadow` keeps the protocol's decision effective;
+(`node bin/tierdecay.js …` from a checkout; `npm install -g
+github:alebgl77/tierdecay#v0.5.0` or the Claude Code plugin puts `tierdecay`
+on the PATH.) The MCP server exposes `tierdecay_route`, `tierdecay_rubric`,
+`tierdecay_playbook`, `tierdecay_status`, `tierdecay_export`,
+`tierdecay_doctor`, and `tierdecay_validate_observation`;
+`tierdecay_record` exists only with `--allow-ledger-append true`. `shadow`
+keeps the protocol's decision effective;
 `optimize` must be enabled explicitly with a calibrated economic configuration
 and fails closed to T3 until its statistical cells have enough samples.
 `bench` replays measured or hypothetical outcomes under seeded permutations
@@ -232,6 +272,29 @@ dependent and one replay order can flatter or hide a policy. See the
 [pilot](benchmarks/pilot-v1/RESULTS.md), and the
 [synthetic regression fixture](benchmarks/README.md). **No universal savings
 claim.**
+
+<details>
+<summary><b>Engineering diagrams</b> — routing decision and decay lifecycle</summary>
+
+<img src="docs/diagrams/routing-decision.svg" alt="Routing decision flowchart: safety gate, quarantine, epoch recertification, playbook probe, ledger priors, rubric, dispatch, verify, escalate, distill, with the feedback loop to the next task" width="900" />
+
+<img src="docs/diagrams/decay-lifecycle.svg" alt="Decay lifecycle state machine: scored, distilled, probing, decayed, quarantined, recertifying, with the hits-by-risk table and invariants" width="900" />
+
+Generated from [`scripts/build-diagrams.js`](scripts/build-diagrams.js); CI
+fails if the SVGs drift from the generator.
+</details>
+
+## Running in production (Linux)
+
+| Need | What ships |
+|---|---|
+| CI gate | [`action.yml`](action.yml): `uses: alebgl77/tierdecay@v0.5.0` runs `doctor`, writes a job summary, fails the step on any failing check |
+| Containers | [`Dockerfile`](Dockerfile): distroless `nonroot`, base images pinned by digest, runs with `--read-only --network none` |
+| Concurrency | ledger appends take an exclusive lock, re-validate, `fsync`, and rename; stale locks are broken after 30 s |
+| Supply chain | releases are cut by CI from a tag on `main` after the full matrix passes; archive + CycloneDX SBOM + `SHA256SUMS` |
+| Operations | stable exit codes, bash completion, canonical JSON output, no clock or randomness |
+
+Full guide: [`docs/PRODUCTION.md`](docs/PRODUCTION.md).
 
 ## Why it doesn't rot
 
@@ -292,7 +355,7 @@ the repo you point it at.
 cd your-project        # the repo you want to equip — NOT the tierdecay checkout
 /path/to/tierdecay-<version>/install.sh auto
 # or pick one explicitly:
-/path/to/tierdecay-<version>/install.sh <claude|agents|cursor|gemini|aider|cline|goose|windsurf>
+/path/to/tierdecay-<version>/install.sh <claude|codex|antigravity|agents|cursor|gemini|aider|cline|goose|windsurf>
 # preview without writing: /path/to/tierdecay-<version>/install.sh --dry-run <target>
 ```
 
@@ -318,7 +381,27 @@ and [`core/MODELS.md`](core/MODELS.md) for the current policy.
 </details>
 
 <details>
-<summary><b>Codex CLI · OpenCode · Copilot · Zed</b> (AGENTS.md)</summary>
+<summary><b>OpenAI Codex</b> (native — 4 roles, effort tiers, guard hook, MCP)</summary>
+
+Copies `AGENTS.md`, `.codex/` (four roles in `.codex/agents/` bound by
+`model_reasoning_effort` `xhigh`/`high`/`medium`/`low` with matching sandboxes,
+the MCP advisor in `config.toml`, a `PreToolUse` guard on `apply_patch` and
+`Bash` scoped to executor roles), and the shared Agent Skills to
+`.agents/skills/`. Trust the project, then approve the hook with `/hooks`.
+See [`adapters/codex/`](adapters/codex/).
+</details>
+
+<details>
+<summary><b>Google Antigravity</b> (native — always-on rule, 4 subagents, MCP)</summary>
+
+Copies an always-on workspace rule, four subagents in `.agents/agents/`
+(`pro` for T3/T2, `flash` for T1/T0, executors sandboxed), the shared Agent
+Skills, and `.agents/mcp_config.json`. See
+[`adapters/antigravity/`](adapters/antigravity/).
+</details>
+
+<details>
+<summary><b>OpenCode · Copilot · Zed · any AGENTS.md reader</b> (AGENTS.md)</summary>
 
 One `AGENTS.md` speaks to every CLI that adopted the standard. Single-agent
 mode: phases replace subagents, model switching via your CLI's mechanism
@@ -403,9 +486,24 @@ actually passed in *your* repo, refuses to descend without evidence, and
 re-certifies when models change — then exports that as a table or as Agent
 Skills for the router you already use.
 
+## Versions and roadmap
+
+| Version | Date | Highlights |
+|---|---|---|
+| **0.5.0** | 2026-10-01 | Codex and Antigravity native adapters, shared Agent Skills, MCP server (2026-07-28 + legacy), `doctor`, locked ledger append, OCI image, GitHub Action, SBOM, automated tagged releases, engineering diagrams |
+| 0.4.0 | 2026-10-01 | Real-model pilot (36 graded runs), confidence-gated decay, recertification, effort axis, Claude Code plugin |
+| 0.3.0 | 2026-09-26 | Deterministic zero-dependency router: shadow/optimize, bounded statistics, sequential replay |
+| 0.2.1 | 2026-09-03 | Four roles on two aliases, cross-OS regressions, release readiness gate |
+| 0.2.0 | 2026-09-03 | Cline, Goose, Windsurf, Cursor adapters; executor guard; dry-run and uninstall |
+| 0.1.0 | 2026-07-12 | Protocol, rubric, ledger, playbook, first adapters, installer |
+
+Every change: [`CHANGELOG.md`](CHANGELOG.md). Next — pilot v2 on classes the
+fast tier fails cold, team ledger merge, OpenTelemetry GenAI export,
+calibration, stable 1.0 contracts: [`ROADMAP.md`](ROADMAP.md).
+
 ## Contributing
 
-Adapters wanted: Qwen Code, Amp, Continue, Cody. One folder, one
+Adapters wanted: Qwen Code, Amp, Continue, Kiro. One folder, one
 context file, one README — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---

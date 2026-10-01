@@ -2,7 +2,8 @@
 'use strict';
 
 // Generate the Claude Code plugin (plugins/tierdecay) from the native adapter
-// and the engine, so the two install paths can never drift.
+// and the engine, and mirror the shared guard into the Codex adapter, so no
+// install path can drift from its source.
 //
 //   node scripts/build-plugin.js          write generated files
 //   node scripts/build-plugin.js --check  exit 1 if any generated file differs
@@ -69,10 +70,18 @@ const GENERATED = [
   ])
 ];
 
+// Copies outside the plugin, relative to the repository root.
+const MIRRORED = [
+  ['adapters/codex/.codex/hooks/tierdecay-guard.sh', () => read(path.join(ADAPTER, '.claude', 'hooks', 'tierdecay-guard.sh')), 0o755]
+];
+
 function main(check) {
   const stale = [];
-  for (const [relative, render, mode] of GENERATED) {
-    const target = path.join(PLUGIN, relative);
+  const outputs = [
+    ...GENERATED.map(([relative, render, mode]) => [path.join(PLUGIN, relative), relative, render, mode]),
+    ...MIRRORED.map(([relative, render, mode]) => [path.join(ROOT, relative), relative, render, mode])
+  ];
+  for (const [target, relative, render, mode] of outputs) {
     const content = render();
     const current = fs.existsSync(target) ? read(target) : null;
     if (check) {
@@ -85,11 +94,11 @@ function main(check) {
     if (mode) fs.chmodSync(target, mode);
   }
   if (check && stale.length) {
-    process.stderr.write(`plugins/tierdecay is out of date; run node scripts/build-plugin.js\n  ${stale.join('\n  ')}\n`);
+    process.stderr.write(`generated files are out of date; run node scripts/build-plugin.js\n  ${stale.join('\n  ')}\n`);
     process.exitCode = 1;
     return;
   }
-  process.stdout.write(`${check ? 'checked' : 'generated'} ${GENERATED.length} plugin files\n`);
+  process.stdout.write(`${check ? 'checked' : 'generated'} ${GENERATED.length} plugin files and ${MIRRORED.length} adapter mirror(s)\n`);
 }
 
 main(process.argv.includes('--check'));

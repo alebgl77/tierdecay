@@ -55,8 +55,10 @@ jobs:
           for d in adapters/*/; do
             [ -f "${d}README.md" ] || { echo "::error::${d} has no README.md"; exit 1; }
             # Exclude README.md so the check actually proves a native context
-            # file (AGENTS.md/GEMINI.md/CLAUDE.md/CONVENTIONS.md) is shipped.
-            if ! find "$d" -maxdepth 1 -type f -name '*.md' ! -name 'README.md' | grep -q .; then
+            # file (AGENTS.md/GEMINI.md/CLAUDE.md/CONVENTIONS.md, or an
+            # Antigravity workspace rule) is shipped.
+            if ! { find "$d" -maxdepth 1 -type f -name '*.md' ! -name 'README.md'; \
+                   find "$d" -path '*/.agents/rules/*.md' -type f; } | grep -q .; then
               echo "::error::${d} ships no native context file"; exit 1
             fi
           done
@@ -260,6 +262,7 @@ jobs:
           node tests/test-router.js
           node tests/test-posterior.js
           node tests/test-production.js
+          node tests/test-adapters.js
 
   conformance:
     name: Protocol conformance
@@ -274,7 +277,8 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
           for f in adapters/*/AGENTS.md adapters/*/CLAUDE.md \
-                   adapters/*/GEMINI.md adapters/*/CONVENTIONS.md; do
+                   adapters/*/GEMINI.md adapters/*/CONVENTIONS.md \
+                   adapters/*/.agents/rules/*.md; do
             n=$(wc -l < "$f")
             [ "$n" -le 120 ] || { echo "::error::$f is $n lines (>120 cap)"; exit 1; }
           done
@@ -285,7 +289,7 @@ jobs:
           set -euo pipefail
           declare -A map=( [agents-md]=agents [gemini-cli]=gemini [claude-code]=claude \
                            [aider]=aider [cline]=cline [goose]=goose [windsurf]=windsurf \
-                           [cursor]=cursor )
+                           [cursor]=cursor [codex]=codex [antigravity]=antigravity )
           for d in adapters/*/; do
             name="$(basename "$d")"
             t="${map[$name]:-$name}"
@@ -324,7 +328,8 @@ jobs:
           nonnative=(adapters/agents-md/AGENTS.md adapters/aider/CONVENTIONS.md \
                      adapters/gemini-cli/GEMINI.md adapters/cline/AGENTS.md \
                      adapters/goose/AGENTS.md adapters/windsurf/AGENTS.md \
-                     adapters/cursor/AGENTS.md)
+                     adapters/cursor/AGENTS.md adapters/codex/AGENTS.md \
+                     adapters/antigravity/.agents/rules/tierdecay.md)
           need=("150" "QUARANTINE" "verb-object-surface" "PROTOCOL.md" "any axis maxed")
           for f in "${nonnative[@]}"; do
             for tok in "${need[@]}"; do
@@ -332,6 +337,21 @@ jobs:
             done
           done
           echo "All non-native adapters carry the normative tokens."
+
+      - name: Codex and Antigravity configuration parses
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob, json, sys, tomllib
+          files = glob.glob("adapters/codex/.codex/**/*.toml", recursive=True) + glob.glob("adapters/codex/profiles/*.toml")
+          for f in files:
+              with open(f, "rb") as h:
+                  tomllib.load(h)
+          for f in ["adapters/codex/.codex/hooks.json", "adapters/antigravity/.agents/mcp_config.json"]:
+              json.load(open(f))
+          print(f"parsed {len(files)} TOML and 2 JSON files")
+          PY
+          node tests/test-adapters.js
 
   docs:
     name: Docs integrity (offline)
@@ -372,7 +392,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        target: [claude, agents, cursor, gemini, aider, cline, goose, windsurf]
+        target: [claude, codex, antigravity, agents, cursor, gemini, aider, cline, goose, windsurf]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -388,9 +408,9 @@ jobs:
 
           "$GITHUB_WORKSPACE/install.sh" "$t"
 
-          # A context file must land (at least one of the four).
+          # A context file must land (at least one of these).
           found=""
-          for c in CLAUDE.md AGENTS.md GEMINI.md CONVENTIONS.md; do
+          for c in CLAUDE.md AGENTS.md GEMINI.md CONVENTIONS.md .agents/rules/tierdecay.md; do
             [ -f "$c" ] && found=1
           done
           [ -n "$found" ] || { echo "::error::$t: no context file installed"; exit 1; }

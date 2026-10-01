@@ -61,6 +61,23 @@ function sleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
+// Windows reports a file that another process is deleting or holding open as
+// EPERM / EACCES / EBUSY rather than EEXIST; treat those as contention.
+const TRANSIENT = new Set(['EPERM', 'EACCES', 'EBUSY']);
+const transient = (error) => process.platform === 'win32' && TRANSIENT.has(error.code);
+
+function renameWithRetry(from, to) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      fs.renameSync(from, to);
+      return;
+    } catch (error) {
+      if (!transient(error) || attempt >= 8) throw error;
+      sleep(25 * 2 ** Math.min(attempt, 4));
+    }
+  }
+}
+
 function withLock(target, fn, { timeoutMs = LOCK_TIMEOUT_MS, staleMs = LOCK_STALE_MS } = {}) {
   const lock = `${target}.lock`;
   const deadline = Date.now() + timeoutMs;
@@ -70,9 +87,17 @@ function withLock(target, fn, { timeoutMs = LOCK_TIMEOUT_MS, staleMs = LOCK_STAL
       fd = fs.openSync(lock, 'wx', 0o600);
       fs.writeSync(fd, `${process.pid}\n`);
     } catch (error) {
-      if (error.code !== 'EEXIST') throw error;
+      if (fd !== null) {
+        fs.closeSync(fd);
+        try { fs.unlinkSync(lock); } catch (_) { /* best effort */ }
+        throw error;
+      }
+      if (error.code !== 'EEXIST' && !transient(error)) throw error;
       let age = 0;
-      try { age = Date.now() - fs.statSync(lock).mtimeMs; } catch (_) { continue; }
+      try { age = Date.now() - fs.statSync(lock).mtimeMs; } catch (_) {
+        if (Date.now() > deadline) throw Object.assign(new Error(`ledger is locked: ${lock}`), { exitCode: 3 });
+        continue;
+      }
       if (age > staleMs) {
         try { fs.unlinkSync(lock); } catch (_) { /* another writer broke it first */ }
         continue;
@@ -120,7 +145,7 @@ function appendObservation(ledgerPath, observation, options = {}) {
       } finally {
         fs.closeSync(fd);
       }
-      fs.renameSync(temp, target);
+      renameWithRetry(temp, target);
     } catch (error) {
       try { fs.unlinkSync(temp); } catch (_) { /* nothing to clean */ }
       throw error;
