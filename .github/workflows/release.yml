@@ -12,6 +12,11 @@ on:
         description: Existing tag to release (vMAJOR.MINOR.PATCH)
         required: true
         type: string
+      verified:
+        description: The caller already verified the tagged commit
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -22,6 +27,7 @@ env:
 jobs:
   ci:
     name: Validate tagged commit
+    if: ${{ !inputs.verified }}
     uses: ./.github/workflows/ci.yml
     with:
       checkout_ref: ${{ inputs.tag || github.sha }}
@@ -31,6 +37,7 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: ci
+    if: ${{ !cancelled() && (needs.ci.result == 'success' || (inputs.verified && needs.ci.result == 'skipped')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -79,7 +86,9 @@ jobs:
           }' CITATION.cff)"
           installer_version="$(sed -n 's/^VERSION="\([^"]*\)"$/\1/p' install.sh)"
           package_version="$(node -p 'require("./package.json").version')"
-          engine_version="$(node -p 'require("./core/engine/version").VERSION')"
+          # core/engine/version.js exists from 0.5.0 on; older tags predate it.
+          engine_version="$tag"
+          [ ! -f core/engine/version.js ] || engine_version="$(node -p 'require("./core/engine/version").VERSION')"
           [ "$changelog_version" = "$tag" ] \
             || { echo "::error::CHANGELOG.md version != ${tag}"; exit 1; }
           [ "$citation_version" = "$tag" ] \
@@ -123,7 +132,10 @@ jobs:
           ver="${TAG#v}"
           git archive --format=tar.gz --prefix="tierdecay-${ver}/" \
             -o "tierdecay-${ver}.tar.gz" "${TAG}"
-          node scripts/sbom.js "${ver}" "tierdecay-${ver}.tar.gz" > "tierdecay-${ver}.cdx.json"
+          # SBOM tooling comes from the workflow's own commit, so backfilled
+          # tags that predate scripts/sbom.js get the same SBOM format.
+          git show "${GITHUB_SHA}:scripts/sbom.js" > "${RUNNER_TEMP}/sbom.js"
+          node "${RUNNER_TEMP}/sbom.js" "${ver}" "tierdecay-${ver}.tar.gz" > "tierdecay-${ver}.cdx.json"
           sha256sum --binary "tierdecay-${ver}.tar.gz" "tierdecay-${ver}.cdx.json" > SHA256SUMS
           sha256sum --check SHA256SUMS
           cat SHA256SUMS
