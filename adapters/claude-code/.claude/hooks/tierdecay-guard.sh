@@ -24,6 +24,9 @@
 # (plugin agents ignore `hooks:` frontmatter), so the plugin passes
 # `--executors-only`: the guard then enforces only when the payload's
 # `agent_type` names a TierDecay executor and lets the main thread through.
+# The Codex adapter uses the same script and payload contract (Codex hooks are
+# Claude Code compatible: `agent_type` for subagents, exit 2 blocks), plus the
+# `apply_patch` envelope handled below.
 set -euo pipefail
 
 deny_no_node() {
@@ -139,7 +142,7 @@ function isStatePath(value) {
   if (hasStateSegment(value)) return true;
 
   try {
-    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.env.TIERDECAY_PROJECT_DIR || process.cwd();
     const canonicalPath = canonicalize(value, projectRoot);
     return [".claude", ".tierdecay"].some((directory) => {
       const stateRoot = canonicalize(rawJoin(projectRoot, directory), projectRoot);
@@ -173,6 +176,26 @@ const toolInput = payload.tool_input && typeof payload.tool_input === "object"
 if (mutationPaths.has(tool)) {
   const target = toolInput[mutationPaths.get(tool)];
   if (typeof target !== "string" || target.length === 0 || isStatePath(target)) deny();
+}
+
+// Codex: apply_patch carries a patch envelope, not a target path. Every file
+// the patch adds, updates, deletes, or moves to is a target. Paths in the
+// envelope are relative to the session cwd (the hook cwd).
+if (tool === "apply_patch") {
+  const texts = [];
+  (function collect(value) {
+    if (typeof value === "string") texts.push(value);
+    else if (value && typeof value === "object") Object.values(value).forEach(collect);
+  })(toolInput);
+  const header = /^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+?)\s*$/gm;
+  const targets = [];
+  for (const text of texts) for (const match of text.matchAll(header)) targets.push(match[1]);
+  if (targets.length === 0) {
+    // Unknown envelope shape: fall back to the conservative literal check.
+    if (texts.some((text) => /(^|[^A-Za-z0-9_.-])\.(?:claude|tierdecay)[ .]*(?=$|[\\/]|[^A-Za-z0-9_.-])/i.test(text))) deny();
+  } else if (targets.some((target) => isStatePath(path.resolve(process.cwd(), target)))) {
+    deny();
+  }
 }
 
 if (tool === "Bash") {

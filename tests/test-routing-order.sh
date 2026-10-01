@@ -63,9 +63,12 @@ check_order "adapters/cursor/AGENTS.md" '^2[.] .*PLAN' '^3[.] '
 check_order "adapters/gemini-cli/GEMINI.md" '^2[.] .*PLAN' '^3[.] '
 check_order "adapters/goose/AGENTS.md" '^2[.] .*PLAN' '^3[.] '
 check_order "adapters/windsurf/AGENTS.md" '^2[.] .*PLAN' '^3[.] '
+check_order "adapters/codex/AGENTS.md" '^2[.] .*PLAN' '^3[.] '
+check_order "adapters/antigravity/.agents/rules/tierdecay.md" '^2[.] .*PLAN' '^3[.] '
 
 for file in "$repo_root"/adapters/*/AGENTS.md "$repo_root"/adapters/*/CLAUDE.md \
-            "$repo_root"/adapters/*/GEMINI.md "$repo_root"/adapters/*/CONVENTIONS.md; do
+            "$repo_root"/adapters/*/GEMINI.md "$repo_root"/adapters/*/CONVENTIONS.md \
+            "$repo_root"/adapters/*/.agents/rules/*.md; do
   relative="${file#"$repo_root"/}"
   lines="$(wc -l < "$file")"
   [ "$lines" -le 120 ] || fail "$relative: $lines lines exceeds the 120-line cap"

@@ -8,3 +8,11 @@ updates:
       interval: weekly
     commit-message:
       prefix: ci
+
+  # Base images in Dockerfile are pinned by digest; let Dependabot refresh them.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build

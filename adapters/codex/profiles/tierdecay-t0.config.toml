@@ -1,0 +1,5 @@
+# TierDecay tier T0 for single-session work: `codex --profile tierdecay-t0`.
+# Copy to $CODEX_HOME (default ~/.codex) as tierdecay-t0.config.toml.
+# Leave `model` unset to use your default model, or pin one recorded in
+# .tierdecay/MODELS.md (a pin is a new binding epoch).
+model_reasoning_effort = "low"

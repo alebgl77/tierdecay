@@ -21,6 +21,18 @@ const BINDINGS = Object.freeze({
     T1: { agent: 'executor', model: 'sonnet', effort: 'medium' },
     T0: { agent: 'scout', model: 'sonnet', effort: 'low' }
   },
+  codex: {
+    T3: { role: 'oracle', profile: 'tierdecay-t3', effort: 'xhigh' },
+    T2: { role: 'heavy-executor', profile: 'tierdecay-t2', effort: 'high' },
+    T1: { role: 'executor', profile: 'tierdecay-t1', effort: 'medium' },
+    T0: { role: 'scout', profile: 'tierdecay-t0', effort: 'low' }
+  },
+  antigravity: {
+    T3: { subagent: 'oracle', mode: 'Planning', model: 'pro' },
+    T2: { subagent: 'heavy-executor', mode: 'Planning', model: 'pro' },
+    T1: { subagent: 'executor', mode: 'Fast', model: 'flash' },
+    T0: { subagent: 'scout', mode: 'Fast', model: 'flash' }
+  },
   cursor: {
     T3: { mode: 'Auto (Intelligence) or your frontier model' },
     T2: { mode: 'Auto (Balance)' },
@@ -33,7 +45,7 @@ const BINDINGS = Object.freeze({
   }
 });
 
-const FORMATS = ['json', 'claude', 'cursor', 'skills'];
+const FORMATS = ['json', 'claude', 'codex', 'antigravity', 'cursor', 'skills'];
 const SKILL_PREFIX = 'tierdecay-';
 const GENERATED_MARKER = 'generated-by: tierdecay';
 
@@ -71,6 +83,22 @@ function exportClaude(state) {
   return `# TierDecay routes (Claude Code)\n\n${table(['class', 'tier', 'agent', 'model', 'effort', 'why'], rows)}\n\n${FOOTER}\n`;
 }
 
+function exportCodex(state) {
+  const rows = routes(state).map((route) => {
+    const binding = BINDINGS.codex[route.tier];
+    return [`\`${route.class}\``, route.tier, `\`${binding.role}\``, `\`${binding.effort}\``, `\`codex --profile ${binding.profile}\``, why(route)];
+  });
+  return `# TierDecay routes (Codex)\n\nDelegate each task to the role its tier maps to (\`.codex/agents/\` from the TierDecay Codex adapter); in a single session, use the profile instead (\`profiles/\` in the adapter, copied to \`$CODEX_HOME\`). Roles inherit the session model; tiers differ by reasoning effort.\n\n${table(['class', 'tier', 'role', 'reasoning effort', 'single-session profile', 'why'], rows)}\n\n${FOOTER}\n`;
+}
+
+function exportAntigravity(state) {
+  const rows = routes(state).map((route) => {
+    const binding = BINDINGS.antigravity[route.tier];
+    return [`\`${route.class}\``, route.tier, `\`${binding.subagent}\``, `\`${binding.model}\``, binding.mode, why(route)];
+  });
+  return `# TierDecay routes (Antigravity)\n\nDelegate each task to the subagent its tier maps to (\`.agents/agents/\` from the TierDecay Antigravity adapter); without subagents, run the conversation in this mode on this model class.\n\n${table(['class', 'tier', 'subagent', 'model', 'agent mode', 'why'], rows)}\n\n${FOOTER}\n`;
+}
+
 function exportCursor(state) {
   const rows = routes(state).map((route) => [`\`${route.class}\``, route.tier, BINDINGS.cursor[route.tier].mode, why(route)]);
   return `# TierDecay routes (Cursor)\n\nPick the Cursor model or Auto goal for the conversation that carries the task.\n\n${table(['class', 'tier', 'Cursor model / Auto goal', 'why'], rows)}\n\n${FOOTER}\n`;
@@ -84,6 +112,8 @@ function exportJson(state) {
     routes: routes(state).map((route) => ({
       ...route,
       claude: BINDINGS.claude[route.tier],
+      codex: BINDINGS.codex[route.tier],
+      antigravity: BINDINGS.antigravity[route.tier],
       cursor: BINDINGS.cursor[route.tier],
       generic: BINDINGS.generic[route.tier]
     }))
@@ -159,7 +189,8 @@ function exportPosterior({ ledger, playbook, playbookText, epoch, format, out })
   if (format === 'skills') return { kind: 'json', value: exportSkills(playbook, playbookText, out) };
   const state = status({ ledger, playbook, epoch });
   if (format === 'json') return { kind: 'json', value: exportJson(state) };
-  return { kind: 'text', value: format === 'claude' ? exportClaude(state) : exportCursor(state) };
+  const render = { claude: exportClaude, codex: exportCodex, antigravity: exportAntigravity, cursor: exportCursor }[format];
+  return { kind: 'text', value: render(state) };
 }
 
 module.exports = { BINDINGS, FORMATS, exportPosterior, skillName };

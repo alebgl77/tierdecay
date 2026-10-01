@@ -1,6 +1,6 @@
 {
   "name": "tierdecay",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Per-repo learning layer for AI coding CLI model routing: deterministic advisor over TierDecay Markdown state",
   "license": "MIT",
   "private": true,
@@ -9,7 +9,7 @@
     "tierdecay": "bin/tierdecay.js"
   },
   "scripts": {
-    "test": "node tests/test-router.js && node tests/test-posterior.js && node tests/test-model-policy.js && node scripts/build-plugin.js --check"
+    "test": "node tests/test-router.js && node tests/test-posterior.js && node tests/test-production.js && node tests/test-adapters.js && node tests/test-model-policy.js && node scripts/build-plugin.js --check && node scripts/build-diagrams.js --check"
   },
   "engines": {
     "node": ">=18"

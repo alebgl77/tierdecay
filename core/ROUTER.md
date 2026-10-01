@@ -33,6 +33,8 @@ node bin/tierdecay.js route \
   --config .tierdecay/router-config.json --policy shadow
 
 node bin/tierdecay.js observe --observation observation.json
+node bin/tierdecay.js observe --observation observation.json \
+  --append .tierdecay/ledger.md     # locked, validated, atomic insert
 
 node bin/tierdecay.js replay \
   --scenario scenarios.jsonl --ledger .tierdecay/ledger.md \
@@ -40,13 +42,16 @@ node bin/tierdecay.js replay \
   --config calibrated-router-config.json --policy shadow
 
 node bin/tierdecay.js status --epoch my-bindings-2026-10
-node bin/tierdecay.js export --format claude      # or cursor | json
+node bin/tierdecay.js export --format claude      # or codex | antigravity | cursor | json
 node bin/tierdecay.js export --format skills --out .claude/skills
 node bin/tierdecay.js bench --scenario scenarios.jsonl \
   --config calibrated-router-config.json --permutations 50 --seed 7
+node bin/tierdecay.js doctor --epoch my-bindings-2026-10
+node bin/tierdecay.js mcp                       # MCP server on stdio
 ```
 
-Without `--ledger`/`--playbook`, commands read `.tierdecay/`; when only the
+Without `--ledger`/`--playbook`, commands read `.tierdecay/` under `--root`
+(default: the working directory); when only the
 native `.claude/routing-ledger.md` exists they read it and
 `.claude/skills/repo-playbook/SKILL.md` instead.
 
@@ -54,12 +59,36 @@ Run the CLI from the checksum-verified TierDecay distribution; the installer
 adds only `.tierdecay/ROUTER.md` and the disabled local configuration. `route`
 and `replay` emit canonical one-line JSON with keys sorted, numbers serialized
 to six decimal places, and no timestamp. `observe` emits one validated Markdown
-row to stdout; the orchestrator decides whether to append it. `-` means stdin
-and may be used only once per invocation.
+row to stdout; the orchestrator decides whether to append it. With
+`--append LEDGER` it inserts the row newest-first into a measured ledger
+instead: exclusive lock file (`LEDGER.lock`, stale after 30 s, timeout 10 s),
+re-parse and re-validate the whole ledger, refuse a duplicate `obs_id`, write
+a temporary file, `fsync`, rename, keep the file mode. This is the engine's
+only write path. `-` means stdin and may be used only once per invocation.
 
-Exit codes: `0` valid decision or documented shadow fallback; `2` invalid
-request/config/arguments; `3` ambiguous or incoherent Markdown state; `4`
-replay missing potential outcomes; `5` unexpected internal failure.
+Exit codes: `0` valid decision or documented shadow fallback; `1` `doctor`
+found a failing check; `2` invalid request/config/arguments; `3` ambiguous or
+incoherent Markdown state, or a locked ledger; `4` replay missing potential
+outcomes; `5` unexpected internal failure.
+
+## Doctor and MCP
+
+`doctor` is a read-only health gate: Node version, ledger and playbook parse,
+playbook cap (150 lines), world-writable state files, `MODELS.md`, router
+configuration, guard hook executable (native layout), owed bookkeeping, and
+live entries without `epoch:`. Each check is `ok`, `warn`, or `fail`; any
+`fail` exits 1. The GitHub Action (`action.yml`) wraps it.
+
+`mcp` serves the same functions as MCP tools over newline-delimited JSON-RPC
+on stdio: `tierdecay_route`, `tierdecay_rubric`, `tierdecay_playbook`,
+`tierdecay_status`, `tierdecay_export`, `tierdecay_doctor`,
+`tierdecay_validate_observation`, and, only with
+`--allow-ledger-append true`, `tierdecay_record` (the `--append` path). It
+re-reads state on every call, never logs to stdout, and negotiates either the
+stateless `2026-07-28` protocol (`server/discover`; the version travels in
+`params._meta["io.modelcontextprotocol/protocolVersion"]`; unknown versions
+get error `-32022` listing the supported ones) or the `initialize` handshake
+(`2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`).
 
 ## Status, export, and bench
 
@@ -70,8 +99,10 @@ risk 0 / 1 / 2, null for risk 3; entries without `risk:` count as 2), and the
 bookkeeping the orchestrator owes next. It is read-only.
 
 `export` hands that posterior to the tool that actually picks the model.
-`claude` and `cursor` print Markdown routing tables (Claude Code agent, alias,
-and effort; Cursor model or Auto goal); `json` prints the same data with every
+`claude`, `codex`, `antigravity`, and `cursor` print Markdown routing tables
+(Claude Code agent, alias, and effort; Codex role, reasoning effort, and
+profile; Antigravity subagent, model class, and mode; Cursor model or Auto
+goal); `json` prints the same data with every
 binding. `skills --out DIR` writes one Agent Skills directory
 (`tierdecay-pb-<n>-<class>/SKILL.md`) per live entry and deletes only the
 directories it generated earlier whose entry is no longer live; quarantined

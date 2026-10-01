@@ -1,0 +1,17 @@
+# TierDecay — project configuration for OpenAI Codex.
+# Codex reads project config only in trusted projects. Role files in
+# .codex/agents/ are discovered automatically; hooks in .codex/hooks.json run
+# after you trust them once with /hooks.
+
+[agents]
+# Room for parallel T1 executors plus a scout and the oracle.
+max_threads = 6
+
+# The TierDecay advisor over MCP: routing decisions, playbook lookup, status,
+# exports, and doctor. Read-only. Requires `tierdecay` on PATH
+# (see the adapter README); remove this table if you do not install it.
+[mcp_servers.tierdecay]
+command = "tierdecay"
+args = ["mcp"]
+startup_timeout_sec = 10
+tool_timeout_sec = 30

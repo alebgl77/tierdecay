@@ -94,14 +94,26 @@ bash tests/test-guard.sh
 node tests/test-model-policy.js
 node tests/test-router.js
 node tests/test-posterior.js
-node scripts/build-plugin.js --check      # plugin generated from the adapter, in sync
+node tests/test-production.js             # MCP, doctor, locked append, completion
+node tests/test-adapters.js               # Codex and Antigravity schemas and bindings
+node scripts/build-plugin.js --check      # plugin and Codex guard mirror in sync
+node scripts/build-diagrams.js --check    # docs/diagrams generated and in sync
 node benchmarks/pilot-v1/harness.js validate
 shellcheck install.sh tests/*.sh adapters/claude-code/.claude/hooks/tierdecay-guard.sh plugins/tierdecay/hooks/*.sh
+npm test                                  # the Node suites and both generators in one command
 ```
 
 Editing `adapters/claude-code/` or `core/engine/`? Run
 `node scripts/build-plugin.js` and commit the regenerated `plugins/tierdecay/`
-files with your change.
+files (and `adapters/codex/.codex/hooks/tierdecay-guard.sh`) with your change.
+Editing a diagram? Change `scripts/build-diagrams.js`, never the SVG, and run
+`node scripts/build-diagrams.js`.
+
+Releasing? Bump `package.json`, `core/engine/version.js`, `install.sh`,
+`CITATION.cff`, and the plugin manifest (`node scripts/build-plugin.js`), add a
+`## [x.y.z] - YYYY-MM-DD` section to `CHANGELOG.md`, and merge to `main`:
+`tag-release.yml` runs the full suite on that commit, tags it, and publishes
+the release with its SBOM and checksums.
 
 CI runs the suites on Ubuntu, macOS, and Windows with Git Bash. The guard
 suite invokes `tests/test-guard-windows.js` automatically on Windows; it is

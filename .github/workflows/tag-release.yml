@@ -1,0 +1,111 @@
+name: Tag and release
+
+# Every merge to main whose package.json version has a CHANGELOG section but no
+# tag yet gets an annotated tag and a GitHub Release (archive, SBOM,
+# SHA256SUMS) — after the full CI suite passes on that exact commit. Manual
+# dispatch backfills a missing tag for an earlier commit on main.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to tag, e.g. 0.4.0 (default: package.json at ref)"
+        required: false
+        type: string
+      ref:
+        description: "Commit on main to tag (default: the dispatch commit)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Decide whether a release is due
+    runs-on: ubuntu-latest
+    outputs:
+      create: ${{ steps.plan.outputs.create }}
+      tag: ${{ steps.plan.outputs.tag }}
+      sha: ${{ steps.plan.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref || github.sha }}
+
+      - id: plan
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="${INPUT_VERSION:-$(node -p 'require("./package.json").version')}"
+          [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] \
+            || { echo "::error::'$version' is not strict SemVer"; exit 1; }
+          tag="v${version}"
+          sha="$(git rev-parse HEAD)"
+          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+          git merge-base --is-ancestor "$sha" origin/main \
+            || { echo "::error::$sha is not on main"; exit 1; }
+          create=false
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null; then
+            echo "${tag} already exists; nothing to do."
+          elif grep -q "^## \[${version}\] - " CHANGELOG.md; then
+            create=true
+            echo "${tag} will be created at ${sha}."
+          else
+            echo "CHANGELOG.md has no released section for ${version}; not tagging."
+          fi
+          {
+            echo "create=${create}"
+            echo "tag=${tag}"
+            echo "sha=${sha}"
+          } >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Full CI on the commit to tag
+    needs: plan
+    if: needs.plan.outputs.create == 'true'
+    uses: ./.github/workflows/ci.yml
+    with:
+      checkout_ref: ${{ needs.plan.outputs.sha }}
+    permissions:
+      contents: read
+
+  tag:
+    name: Create annotated tag
+    needs: [plan, verify]
+    if: needs.plan.outputs.create == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.plan.outputs.sha }}
+
+      - env:
+          TAG: ${{ needs.plan.outputs.tag }}
+          SHA: ${{ needs.plan.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$SHA" -m "TierDecay ${TAG}"
+          git push origin "refs/tags/${TAG}"
+
+  release:
+    name: Publish release
+    needs: [plan, tag]
+    if: needs.plan.outputs.create == 'true'
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.plan.outputs.tag }}
+    permissions:
+      contents: write

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "tierdecay": {
+      "command": "tierdecay",
+      "args": ["mcp"]
+    }
+  }
+}

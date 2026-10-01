@@ -4,16 +4,27 @@ on:
   push:
     tags:
       - "v*"
+  # Called by tag-release.yml, which creates the tag with GITHUB_TOKEN (such a
+  # tag push does not trigger workflows by itself).
+  workflow_call:
+    inputs:
+      tag:
+        description: Existing tag to release (vMAJOR.MINOR.PATCH)
+        required: true
+        type: string
 
 permissions:
   contents: read
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   ci:
     name: Validate tagged commit
     uses: ./.github/workflows/ci.yml
     with:
-      checkout_ref: ${{ github.sha }}
+      checkout_ref: ${{ inputs.tag || github.sha }}
     permissions:
       contents: read
 
@@ -27,12 +38,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.tag || github.sha }}
 
       - name: Validate tag and main ancestry
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
+          tag="${TAG}"
           [[ "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] \
             || { echo "::error::tag '$tag' is not strict SemVer (expected vMAJOR.MINOR.PATCH)"; exit 1; }
           git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
@@ -47,7 +58,7 @@ jobs:
       - name: Guard tag <-> CHANGELOG <-> CITATION.cff coherence
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME#v}"
+          tag="${TAG#v}"
           prefix="## [${tag}] - "
           if ! release_line="$(awk -v wanted="$prefix" '
             index($0, wanted) == 1 {count++; line=$0}
@@ -67,12 +78,18 @@ jobs:
             value=$2; gsub(/["[:space:]]/, "", value); print value
           }' CITATION.cff)"
           installer_version="$(sed -n 's/^VERSION="\([^"]*\)"$/\1/p' install.sh)"
+          package_version="$(node -p 'require("./package.json").version')"
+          engine_version="$(node -p 'require("./core/engine/version").VERSION')"
           [ "$changelog_version" = "$tag" ] \
             || { echo "::error::CHANGELOG.md version != ${tag}"; exit 1; }
           [ "$citation_version" = "$tag" ] \
             || { echo "::error::CITATION.cff version != ${tag}"; exit 1; }
           [ "$installer_version" = "$tag" ] \
             || { echo "::error::install.sh VERSION != ${tag} (update the constant)"; exit 1; }
+          [ "$package_version" = "$tag" ] \
+            || { echo "::error::package.json version != ${tag}"; exit 1; }
+          [ "$engine_version" = "$tag" ] \
+            || { echo "::error::core/engine/version.js VERSION != ${tag}"; exit 1; }
           [ "$citation_date" = "$release_date" ] \
             || { echo "::error::CITATION.cff date-released != ${release_date}"; exit 1; }
           echo "Tag ${tag} and date ${release_date} match CHANGELOG, CITATION.cff, and install.sh."
@@ -81,7 +98,7 @@ jobs:
         id: notes
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME#v}"
+          tag="${TAG#v}"
           release_date="$(awk -F ':' '$1 == "date-released" {
             value=$2; gsub(/["[:space:]]/, "", value); print value
           }' CITATION.cff)"
@@ -96,16 +113,18 @@ jobs:
             || { echo "::error::release notes for ${tag} are empty"; exit 1; }
           echo "wrote $(wc -l < RELEASE_NOTES.md) lines of notes"
 
-      - name: Build verifiable archive + SHA256SUMS
+      - name: Build verifiable archive, SBOM, and SHA256SUMS
         run: |
           set -euo pipefail
           # SECURITY.md's distribution guidance is a contract: "releases from
           # this repo carry a SHA256SUMS asset — verify the archive against it
-          # (`sha256sum -c SHA256SUMS`)". Same format as the v0.1.0 assets.
-          ver="${GITHUB_REF_NAME#v}"
+          # (`sha256sum -c SHA256SUMS`)". Same format as the v0.1.0 assets,
+          # plus a CycloneDX SBOM covered by the same checksum file.
+          ver="${TAG#v}"
           git archive --format=tar.gz --prefix="tierdecay-${ver}/" \
-            -o "tierdecay-${ver}.tar.gz" "${GITHUB_REF_NAME}"
-          sha256sum --binary "tierdecay-${ver}.tar.gz" > SHA256SUMS
+            -o "tierdecay-${ver}.tar.gz" "${TAG}"
+          node scripts/sbom.js "${ver}" "tierdecay-${ver}.tar.gz" > "tierdecay-${ver}.cdx.json"
+          sha256sum --binary "tierdecay-${ver}.tar.gz" "tierdecay-${ver}.cdx.json" > SHA256SUMS
           sha256sum --check SHA256SUMS
           cat SHA256SUMS
 
@@ -114,26 +133,38 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          ver="${GITHUB_REF_NAME#v}"
-          gh release create "${GITHUB_REF_NAME}" \
+          ver="${TAG#v}"
+          # A backfilled older tag must not take the "Latest" badge.
+          git fetch --tags --force origin
+          highest="$(git tag -l 'v*' --sort=-v:refname | head -n 1)"
+          latest=false
+          [ "$highest" = "${TAG}" ] && latest=true
+          gh release create "${TAG}" \
             --draft \
             --verify-tag \
-            --title "${GITHUB_REF_NAME}" \
+            --latest="$latest" \
+            --title "TierDecay ${TAG}" \
             --notes-file RELEASE_NOTES.md \
-            "tierdecay-${ver}.tar.gz" SHA256SUMS
+            "tierdecay-${ver}.tar.gz" "tierdecay-${ver}.cdx.json" SHA256SUMS
 
       - name: Verify assets and publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          ver="${GITHUB_REF_NAME#v}"
-          is_draft="$(gh release view "${GITHUB_REF_NAME}" --json isDraft --jq '.isDraft')"
+          ver="${TAG#v}"
+          is_draft="$(gh release view "${TAG}" --json isDraft --jq '.isDraft')"
           [ "$is_draft" = true ] \
             || { echo "::error::release left draft state before asset verification"; exit 1; }
-          assets="$(gh release view "${GITHUB_REF_NAME}" --json assets --jq '.assets[].name')"
+          assets="$(gh release view "${TAG}" --json assets --jq '.assets[].name')"
           grep -Fxq "tierdecay-${ver}.tar.gz" <<< "$assets" \
             || { echo "::error::release archive is missing"; exit 1; }
           grep -Fxq 'SHA256SUMS' <<< "$assets" \
             || { echo "::error::SHA256SUMS is missing"; exit 1; }
-          gh release edit "${GITHUB_REF_NAME}" --draft=false
+          grep -Fxq "tierdecay-${ver}.cdx.json" <<< "$assets" \
+            || { echo "::error::SBOM is missing"; exit 1; }
+          git fetch --tags --force origin
+          highest="$(git tag -l 'v*' --sort=-v:refname | head -n 1)"
+          latest=false
+          [ "$highest" = "${TAG}" ] && latest=true
+          gh release edit "${TAG}" --draft=false --latest="$latest"
