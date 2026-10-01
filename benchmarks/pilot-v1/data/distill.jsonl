@@ -1,0 +1,3 @@
+{"class":"A","usage":{"calls":3,"input":6,"cacheWrite5m":20761,"cacheWrite1h":0,"cacheRead":137062,"outputEstimated":662,"usdInput":0.131241,"usdOutput":0.01324,"usd":0.144481,"usdWarm":0.078923,"models":["claude-opus-5-5"]}}
+{"class":"B","usage":{"calls":3,"input":6,"cacheWrite5m":21092,"cacheWrite1h":0,"cacheRead":137076,"outputEstimated":610,"usdInput":0.132899,"usdOutput":0.0122,"usd":0.145099,"usdWarm":0.079541,"models":["claude-opus-5-5"]}}
+{"class":"C","usage":{"calls":3,"input":6,"cacheWrite5m":21120,"cacheWrite1h":0,"cacheRead":137080,"outputEstimated":540,"usdInput":0.13304,"usdOutput":0.0108,"usd":0.14384,"usdWarm":0.078282,"models":["claude-opus-5-5"]}}

@@ -3,6 +3,7 @@ name: executor
 description: Standard implementation agent for well-specified tasks tagged [T1] — features from a clear spec, unit tests, documentation, renames, config changes, mechanical multi-file edits, straightforward bugfixes with a known repro. MUST BE USED for [T1] tasks.
 tools: Read, Write, Edit, Grep, Glob, Bash
 model: sonnet
+effort: medium
 skills:
   - execution-standards
   - repo-playbook

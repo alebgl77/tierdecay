@@ -28,11 +28,14 @@ constraints, same as the universal AGENTS.md adapter.
 Switching a tier means picking the model per message, or — in recent builds
 (Cursor 2.x/3) that expose **per-surface / per-mode default models** — binding
 T3 to the Agent/Plan surface and a cheaper model to Ask; confirm what your
-build supports. **Avoid `Auto` mode when you want deterministic tiering** — it
-picks a model per request, so the ledger's `executed` tier stops being yours to
-read. Without switching, successful playbook hits may still reduce turns and
-context; net savings depend on fully loaded costs, including failures and
-escalations.
+build supports. **With Cursor's router (`Auto`)**, bind tiers to its goals
+instead of to models: T1 → Auto (Cost), T2 → Auto (Balance), T3 → Auto
+(Intelligence) or an explicit frontier pick; log the goal you chose as the
+`executed` tier. Cursor's router learns across all its users; TierDecay
+supplies what it cannot see — this repo's per-class posterior
+(`tierdecay export --format cursor`). Without switching, successful playbook
+hits may still reduce turns and context; net savings depend on fully loaded
+costs, including failures and escalations.
 
 ## Phases
 
@@ -59,13 +62,15 @@ escalations.
    **Class signature**: 2–4 hyphenated tokens `verb-object-surface`; reuse an
    existing one before minting a new one. Full protocol: `.tierdecay/PROTOCOL.md`.
    After a T2/T3-grade success on a recurring class, add a ≤15-line playbook
-   entry (WHEN / DO / VERIFY + provenance + hits). Update PRIORS at ≥3 rows.
+   entry (WHEN / DO / VERIFY + provenance + hits + risk + epoch). Update PRIORS at ≥3 rows.
 
 ## Decay rules
 
-- Probe pass → hits+1. **2 hits → the class's default tier drops permanently**
-  (rewrite the entry's provenance to the new tier); the counter resets and decay
-  iterates (T3→T2→T1).
+- Probe pass → hits+1. **3 / 4 / 5 hits (entry `risk:` 0 / 1 / 2; none = 2;
+  risk 3 never decays) → the class's default tier drops** (rewrite the entry's
+  provenance); the counter resets and decay iterates (T3→T2→T1).
+- Entry `epoch:` ≠ current binding epoch (`.tierdecay/MODELS.md`) → RECERTIFY at
+  provenance, entry quoted; pass → adopt the epoch, `hits: 0`.
 - Probe fail → move the entry to QUARANTINE with a one-line cause; the failed
   tier is that class's sticky floor.
 - One **escalation** = 2 failed acceptance runs at a tier ⇒ retry one tier up

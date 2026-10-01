@@ -1,0 +1,97 @@
+{
+  "classes": {
+    "add-command-cli": ["A1", "A2", "A3"],
+    "add-migration-store": ["B1", "B2", "B3"],
+    "add-rule-validator": ["C1", "C2", "C3"]
+  },
+  "tasks": {
+    "A1": {
+      "class": "add-command-cli",
+      "objective": "Add a `delete <key>` command to the kvlite CLI that removes a key and its value from the store.",
+      "acceptance": [
+        "`kvlite delete <key>` removes the key, persists the store file, prints `deleted <key>`, exits 0.",
+        "Deleting a missing key exits 3 with `error: no such key: <key>` on stderr.",
+        "Wrong positional count is a usage error (exit 2).",
+        "`npm test` passes."
+      ]
+    },
+    "A2": {
+      "class": "add-command-cli",
+      "objective": "Add a `rename <from> <to>` command to the kvlite CLI that moves a value (the whole record) to a new key.",
+      "acceptance": [
+        "`kvlite rename <from> <to>` moves the full record, persists, prints `renamed <from> -> <to>`, exits 0.",
+        "Missing <from> exits 3 (`no such key: <from>`).",
+        "Existing <to> exits 4 (`key exists: <to>`) unless `--force` is given, in which case it is overwritten.",
+        "`npm test` passes."
+      ]
+    },
+    "A3": {
+      "class": "add-command-cli",
+      "objective": "Add a read-only `count` command to the kvlite CLI that prints how many keys exist.",
+      "acceptance": [
+        "`kvlite count` prints the number of keys (e.g. `3`), exits 0; an empty store prints `0`.",
+        "`--prefix <prefix>` counts only keys starting with the prefix.",
+        "`--json` prints `{\"count\":N}` instead.",
+        "Positional arguments are a usage error (exit 2).",
+        "`npm test` passes."
+      ]
+    },
+    "B1": {
+      "class": "add-migration-store",
+      "objective": "Add schema migration v3 named `add-tags`: every record gets `tags: []` when it has no tags array; existing tags arrays are preserved.",
+      "acceptance": [
+        "Loading a v2 (or v1) document yields version 3 with `tags` on every record.",
+        "Existing `tags` arrays are unchanged.",
+        "`npm test` passes."
+      ]
+    },
+    "B2": {
+      "class": "add-migration-store",
+      "objective": "Add schema migration v4 named `trim-values`: string `value` fields lose leading/trailing whitespace; non-string values, keys, and other fields are untouched.",
+      "acceptance": [
+        "Loading an older document yields version 4 with trimmed string values.",
+        "Keys, non-string values, `createdAt`, and `tags` are untouched.",
+        "`npm test` passes."
+      ]
+    },
+    "B3": {
+      "class": "add-migration-store",
+      "objective": "Add schema migration v5 named `rename-legacy-val`: records with a legacy `val` field get it renamed to `value`; when both exist, `value` wins and `val` is dropped.",
+      "acceptance": [
+        "Loading an older document yields version 5; no record keeps a `val` field.",
+        "`val` becomes `value` when `value` is absent; otherwise `value` is kept.",
+        "`npm test` passes."
+      ]
+    },
+    "C1": {
+      "class": "add-rule-validator",
+      "objective": "Add a `minLength` validation rule (error code `E_MIN_LENGTH`) for strings and arrays.",
+      "acceptance": [
+        "Parameter: non-negative integer; anything else is rejected when the schema is compiled (SchemaError).",
+        "A string or array shorter than the parameter fails with message `<path> must have length >= <min> (got <actual>)`, e.g. `/ must have length >= 3 (got 2)`.",
+        "Values of other types and absent values pass.",
+        "`npm test` passes."
+      ]
+    },
+    "C2": {
+      "class": "add-rule-validator",
+      "objective": "Add a `pattern` validation rule (error code `E_PATTERN`) that tests string values against a regular expression source string.",
+      "acceptance": [
+        "Parameter: a regular expression source string; non-strings or invalid expressions are rejected at schema compile time (SchemaError).",
+        "A non-matching string fails with message `<path> must match /<pattern>/`, e.g. `/id must match /^a/`.",
+        "Non-string values and absent values pass.",
+        "`npm test` passes."
+      ]
+    },
+    "C3": {
+      "class": "add-rule-validator",
+      "objective": "Add an `enum` validation rule (error code `E_ENUM`) that accepts only listed primitive values (strict equality).",
+      "acceptance": [
+        "Parameter: a non-empty array whose items are strings, numbers, booleans, or null; anything else is rejected at schema compile time (SchemaError).",
+        "A value not in the list fails with message `<path> must be one of <items>` where items are JSON-encoded and joined by `, `, e.g. `/ must be one of \"a\", 1, null`.",
+        "Absent values pass.",
+        "`npm test` passes."
+      ]
+    }
+  }
+}

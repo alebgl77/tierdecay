@@ -5,7 +5,7 @@
 # Bash (not strict POSIX): uses BASH_SOURCE and arrays.
 set -euo pipefail
 
-VERSION="0.3.0"
+VERSION="0.4.0"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 DEST="$(pwd -P)"
 

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Seed TierDecay routing state into the current project. Never overwrites an
+# existing file: learned state is the product.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+project="${CLAUDE_PROJECT_DIR:-$PWD}"
+
+seed() { # seed <template> <destination relative to the project>
+  local source="$root/templates/$1"
+  local target="$project/$2"
+  if [ -e "$target" ]; then
+    printf 'kept     %s (already present)\n' "$2"
+  else
+    mkdir -p "$(dirname "$target")"
+    cp "$source" "$target"
+    printf 'created  %s\n' "$2"
+  fi
+}
+
+seed routing-ledger.md .claude/routing-ledger.md
+seed repo-playbook/SKILL.md .claude/skills/repo-playbook/SKILL.md
+seed MODELS.md .tierdecay/MODELS.md
+
+cat <<'NOTE'
+
+Next:
+  - Start sessions on the top tier: /model opus (the main thread is T3).
+  - Optional hardening (recommended): make built-in edits of routing state ask
+    for approval by adding to .claude/settings.json:
+      "permissions": { "ask": ["Edit(.claude/**)", "Edit(.tierdecay/**)"] }
+  - The executor guard is active through the plugin's PreToolUse hook.
+NOTE

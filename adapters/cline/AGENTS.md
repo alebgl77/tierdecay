@@ -56,13 +56,14 @@ on fully loaded costs, including failures and escalations.
    **Class signature**: 2–4 hyphenated tokens `verb-object-surface`; reuse an
    existing one before minting a new one. Full protocol: `.tierdecay/PROTOCOL.md`.
    After a T2/T3-grade success on a recurring class, add a ≤15-line playbook
-   entry (WHEN / DO / VERIFY + provenance + hits). Update PRIORS at ≥3 rows.
+   entry (WHEN / DO / VERIFY + provenance + hits + risk + epoch). Update PRIORS at ≥3 rows.
 
 ## Decay + integrity (identical to core SPEC)
 
-- 2 probe hits → the class's default tier drops permanently (rewrite the
-  entry's provenance to the new tier); counter resets, decay iterates
-  T3→T2→T1. Probe fail → QUARANTINE + one-line cause; the failed tier is a
+- 3 / 4 / 5 probe hits (entry `risk:` 0 / 1 / 2; none = 2; risk 3 never
+  decays) → the class's default tier drops (rewrite the entry's provenance);
+  counter resets, decay iterates T3→T2→T1. Entry `epoch:` ≠ current binding
+  epoch → RECERTIFY at provenance; pass → adopt the epoch, `hits: 0`. Probe fail → QUARANTINE + one-line cause; the failed tier is a
   sticky floor. One escalation = 2 failed acceptance runs at a tier ⇒ retry one
   tier up; 2 escalations → raise the default.
 - `.tierdecay/` is written ONLY during DISTILL, never inside a task diff — and

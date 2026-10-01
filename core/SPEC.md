@@ -16,15 +16,21 @@ tier, plans/routes/verifies), **executors** (do the work), **ledger** and
 
 Tiers are roles; they are never named after a model version in this spec or in
 any adapter. Bind them through your provider's **latest-tracking alias** where
-one exists, so a new model release requires no edit. The concrete bindings —
-and the rule for when to pin an exact ID instead — live in one file:
-`MODELS.md` (installed alongside this spec as `.tierdecay/MODELS.md`).
+one exists, so a new model release requires no edit. A binding is **(alias,
+effort)** where the client exposes effort: two tiers may share a model and
+differ by effort. The concrete bindings — and the rule for when to pin an exact
+ID instead — live in one file: `MODELS.md` (installed alongside this spec as
+`.tierdecay/MODELS.md`). The set of bindings in force is the **binding epoch**;
+changing any model or effort starts a new epoch.
 
 ## 2. Protocol (every non-trivial request)
 
 1. **RECON** — T0 maps the terrain (recon report ≤400 words); the orchestrator
    never explores raw.
 2. **PLAN** — decompose into tasks. Route each task, in this order:
+   - class has a live **playbook** entry whose `epoch:` differs from the
+     current binding epoch → **RECERTIFY**: run at the entry's provenance tier,
+     entry quoted; a pass adopts the new epoch with hits reset to 0;
    - class has a live **playbook** entry (not quarantined, floor not reached)
      → **PROBE** one tier below the entry's provenance, entry quoted in the
      brief. **A live entry outranks PRIORS** so decay keeps iterating;
@@ -69,12 +75,21 @@ implements, T3 reviews). Tie-breaks: strong tests → down; critical path → up
   tier up, both failure reports attached verbatim (§2 step 5).
 - **Distill** only plausibly-recurring classes. Distill decisions —
   invariants, ordering, the trap — never diffs, secrets, or volatile values.
+  Each entry records `risk:` (the class's rubric risk, 0–3) and `epoch:` (the
+  binding epoch its hits were earned under). An entry pays for itself only
+  where the lower tier fails or struggles without it; when the lower tier
+  already passes cold, the saving comes from routing alone
+  (`benchmarks/pilot-v1/RESULTS.md`).
 - **Probe**: next occurrence runs one tier below provenance, entry quoted in
-  the brief. Pass → hits+1; **2 hits → permanent downgrade** — **rewrite the
-  entry's provenance to the new lower tier** — counter resets, decay iterates
-  (T3→T2→T1) until the entry's provenance reaches T1 (the execution floor).
-  Fail → entry quarantined, failed tier becomes a **sticky floor**, escalate
-  normally.
+  the brief. Pass → hits+1. **Downgrade is confidence-gated**: the entry needs
+  **3 / 4 / 5 hits for risk 0 / 1 / 2** (risk-3 classes never decay; an entry
+  without `risk:` counts as risk 2). With quarantine on any failure the
+  evidence is always k passes in k probes, and k is the smallest count whose
+  one-sided 80% Clopper–Pearson lower bound on the pass rate, `0.2^(1/k)`,
+  reaches 0.5 / 0.6 / 0.7. At the threshold, **rewrite the entry's provenance
+  to the new lower tier** — counter resets, decay iterates (T3→T2→T1) until the
+  entry's provenance reaches T1 (the execution floor). Fail → entry
+  quarantined, failed tier becomes a **sticky floor**, escalate normally.
 
 ## 5. Integrity invariants (non-negotiable in every adapter)
 
@@ -99,7 +114,12 @@ net savings depend on fully loaded costs, including failures and escalations.
 
 `bin/tierdecay.js` is the reference, zero-runtime-dependency advisor. Markdown
 remains authoritative; the engine is read-only and `observe` only prints a row
-for the orchestrator to apply. Its default `shadow` policy always keeps the
+for the orchestrator to apply. `status` lists each class's route and the
+bookkeeping the orchestrator owes (decay due, recertification, missing PRIORS);
+`export` hands the posterior to native routers (Claude Code agents with alias
+and effort, Cursor model/Auto goals, JSON) or compiles live entries into Agent
+Skills; `bench` replays potential outcomes under seeded permutations to measure
+order sensitivity. Its default `shadow` policy always keeps the
 legacy §2 decision effective. `optimize` is explicit opt-in and requires a
 calibrated economic configuration. See `ROUTER.md` and `schemas/`.
 

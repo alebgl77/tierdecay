@@ -1,0 +1,18 @@
+{
+  "name": "tierdecay",
+  "owner": {
+    "name": "Alexandre Beguel"
+  },
+  "metadata": {
+    "description": "TierDecay: a per-repo learning layer for AI coding CLI model routing."
+  },
+  "plugins": [
+    {
+      "name": "tierdecay",
+      "source": "./plugins/tierdecay",
+      "description": "Tiered subagents bound by alias and effort, a routing ledger, a self-distilled playbook, confidence-gated tier decay, and a state-write guard for Claude Code.",
+      "category": "productivity",
+      "tags": ["model-routing", "cost", "subagents", "agent-skills"]
+    }
+  ]
+}

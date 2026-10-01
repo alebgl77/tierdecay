@@ -28,8 +28,9 @@ failures and escalations.
    minting a new one. Full protocol: `.tierdecay/PROTOCOL.md`.
 
 ## Decay + integrity (identical to core SPEC)
-2 probe hits → permanent downgrade (rewrite the entry's provenance to the new
-tier), decay iterates T3→T2→T1. Probe fail → QUARANTINE + sticky floor. One
+3 / 4 / 5 probe hits (entry `risk:` 0 / 1 / 2; none = 2; risk 3 never decays)
+→ downgrade (rewrite the entry's provenance), decay iterates T3→T2→T1. Entry
+`epoch:` ≠ current binding epoch → RECERTIFY at provenance first. Probe fail → QUARANTINE + sticky floor. One
 escalation = 2 failed acceptance runs at a tier ⇒ retry one tier up; 2
 escalations → raise the default. Any acceptance failure while an entry was
 referenced → QUARANTINE it immediately. `.tierdecay/` written only during

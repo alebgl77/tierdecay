@@ -32,6 +32,27 @@ run_case() { # run_case <label> <expected-exit> <json> [project-root]
   fi
 }
 
+run_scoped_case() { # run_scoped_case <label> <expected-exit> <json>  (plugin mode)
+  local label="$1"
+  local expected="$2"
+  local payload="$3"
+  local actual
+
+  if printf '%s' "$payload" \
+    | CLAUDE_PROJECT_DIR="$repo_root" "$guard" --executors-only 2>"$stderr_file"; then
+    actual=0
+  else
+    actual=$?
+  fi
+
+  if [ "$actual" -ne "$expected" ]; then
+    printf 'not ok - plugin scope: %s (expected %s, got %s)\n' "$label" "$expected" "$actual"
+    failures=$((failures + 1))
+  else
+    printf 'ok - plugin scope: %s\n' "$label"
+  fi
+}
+
 run_from_nested_cwd() {
   local project="$temp_root/installed project"
   local nested="$project/work/one/two"
@@ -200,6 +221,22 @@ for entry in "${allow_cases[@]}"; do
   run_case "${entry%%|*}" 0 "${entry#*|}"
 done
 
+scoped_cases=(
+  '0|main thread may write state|{"tool_name":"Write","tool_input":{"file_path":".tierdecay/playbook.md"}}'
+  '0|unrelated subagent is not scoped|{"tool_name":"Write","agent_type":"Explore","tool_input":{"file_path":".claude/x.md"}}'
+  '0|lookalike agent name is not scoped|{"tool_name":"Write","agent_type":"my-executor-x","tool_input":{"file_path":".claude/x.md"}}'
+  '2|plugin executor state write|{"tool_name":"Write","agent_type":"tierdecay:executor","tool_input":{"file_path":".tierdecay/playbook.md"}}'
+  '2|bare executor state write|{"tool_name":"Edit","agent_type":"executor","tool_input":{"file_path":".claude/routing-ledger.md"}}'
+  '2|heavy executor Bash state reference|{"tool_name":"Bash","agent_type":"tierdecay:heavy-executor","tool_input":{"command":"echo x >> .claude/routing-ledger.md"}}'
+  '0|executor ordinary write|{"tool_name":"Write","agent_type":"tierdecay:executor","tool_input":{"file_path":"src/app.py"}}'
+  '2|malformed payload fails closed|not json'
+)
+for entry in "${scoped_cases[@]}"; do
+  expected="${entry%%|*}"
+  rest="${entry#*|}"
+  run_scoped_case "${rest%%|*}" "$expected" "${rest#*|}"
+done
+
 run_without_node
 run_from_nested_cwd
 run_symlink_case
@@ -213,4 +250,4 @@ if [ "$failures" -ne 0 ]; then
 fi
 
 printf 'all %s guard checks completed (%s skipped)\n' \
-  "$(( ${#deny_cases[@]} + ${#allow_cases[@]} + 6 ))" "$skips"
+  "$(( ${#deny_cases[@]} + ${#allow_cases[@]} + ${#scoped_cases[@]} + 6 ))" "$skips"

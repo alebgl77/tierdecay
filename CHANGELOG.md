@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning][semver].
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-01
+
+Repositioned as the per-repo learning layer for native model routers rather
+than a router of its own.
+
+### Added
+
+- `benchmarks/pilot-v1`: first measurement with real models — 36 graded Opus
+  and Sonnet executor runs plus 3 distillation runs on a controlled fixture
+  with hidden acceptance tests, exact input-side billing from transcripts,
+  task-paired bootstrap contrasts, and a replay of the protocol on the
+  measured outcomes. Fast tier 0.66× frontier cost at equal acceptance;
+  protocol replay 24% below always-frontier; the distilled entry itself not
+  significantly cheaper than a cold fast-tier attempt. Scope and limits in
+  `RESULTS.md`; CI validates the fixture.
+- Claude Code plugin (`plugins/tierdecay`) and marketplace
+  (`.claude-plugin/marketplace.json`): `/plugin install tierdecay@tierdecay`,
+  `/tierdecay:init`, an executor-scoped `PreToolUse` guard, a `SessionStart`
+  hook that loads the protocol only in opted-in projects, and `tierdecay` on
+  the Bash PATH. Generated from the native adapter by
+  `scripts/build-plugin.js`; CI fails if they drift.
+- `tierdecay status`: per-class route, hits against the risk-gated
+  requirement, and the bookkeeping owed (decay, recertification, PRIORS).
+- `tierdecay export`: routing tables for Claude Code (agent, alias, effort)
+  and Cursor (model or Auto goal), JSON, and Agent Skills compiled from live
+  playbook entries (quarantined entries are pruned, foreign skills untouched).
+- `tierdecay bench`: seeded-permutation replay with in-memory playbook
+  evolution (hits, decays, quarantines, recertification), order spread, and
+  static/oracle baselines.
+- Recertification: entries carry `epoch:`; a binding change routes them at
+  provenance (`recertify`) before any further descent.
+- Effort as the second binding axis: `oracle` `xhigh`, `heavy-executor`
+  `high`, `executor` `medium`, `scout` `low`.
+
+### Changed
+
+- **Decay is confidence-gated**: a downgrade needs 3 / 4 / 5 probe hits for
+  risk 0 / 1 / 2 (80% one-sided Clopper–Pearson bound on the pass rate
+  reaching 0.5 / 0.6 / 0.7); risk-3 classes never decay; entries without
+  `risk:` count as risk 2. Previously 2 hits for every class.
+- Policy, enforced by `tests/test-model-policy.js`: no tier is bound to the
+  cheapest model family; the cheap end of the ladder is `sonnet` at lower
+  effort.
+- Cursor adapter maps tiers to the router's Auto goals instead of advising
+  against Auto.
+- CLI defaults fall back to `.claude/routing-ledger.md` and the native
+  playbook skill when `.tierdecay/ledger.md` is absent.
+- SPEC §4 records when distillation pays: where the lower tier fails or
+  struggles without the entry.
+
+### Fixed
+
+- The shipped playbook templates did not parse with the advisor (the entry
+  format example was read as a malformed entry), so every CLI command failed
+  on a fresh install. Fenced code blocks are now documentation, and the
+  templates fence their example.
+- The guard script forwards its arguments to Node safely under `set -u` on
+  Bash 3.2.
+
 ## [0.3.0] - 2026-09-26
 
 ### Added
@@ -222,7 +281,8 @@ Initial public release.
 
 [keepachangelog]: https://keepachangelog.com/en/1.1.0/
 [semver]: https://semver.org/spec/v2.0.0.html
-[unreleased]: https://github.com/alebgl77/tierdecay/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/alebgl77/tierdecay/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/alebgl77/tierdecay/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/alebgl77/tierdecay/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/alebgl77/tierdecay/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/alebgl77/tierdecay/compare/v0.1.0...v0.2.0

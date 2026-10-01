@@ -3,16 +3,17 @@ message: "If you use this software, please cite it as below."
 type: software
 title: "TierDecay"
 abstract: >-
-  A self-distilling model router for AI coding CLIs that solves each
-  problem-class once at an expensive model tier, compiles the solution into
-  a playbook entry, and routes subsequent occurrences of that class to
-  progressively cheaper tiers based on an empirical ledger of predicted
-  versus executed outcomes.
+  A per-repo learning layer for AI coding CLI model routing. It records
+  predicted versus executed tiers per task class in a Markdown ledger,
+  distills high-tier solutions into playbook entries, lowers a class's tier
+  only after confidence-gated probe evidence, re-certifies on model or effort
+  changes, and exports the learned posterior to native routers and Agent
+  Skills.
 authors:
   - family-names: "Beguel"
     given-names: "Alexandre"
-version: 0.3.0
-date-released: "2026-09-26"
+version: 0.4.0
+date-released: "2026-10-01"
 license: MIT
 repository-code: "https://github.com/alebgl77/tierdecay"
 url: "https://github.com/alebgl77/tierdecay"
@@ -24,3 +25,5 @@ keywords:
   - developer-tools
   - model-routing
   - in-context-distillation
+  - agent-skills
+  - claude-code-plugin

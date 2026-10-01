@@ -27,8 +27,10 @@ playbook, and the decay rules on top. State: `.tierdecay/ledger.md`,
   `verb-object-surface` — reuse an existing one before minting a new one.
   Full protocol: `.tierdecay/PROTOCOL.md`.
 - After a high-tier success on a recurring class: ≤15-line playbook entry
-  (WHEN/DO/VERIFY, provenance, hits). 2 probe hits → class drops a tier for
-  good (rewrite provenance); probe fail → QUARANTINE + sticky floor. One
+  (WHEN/DO/VERIFY, provenance, hits, risk, epoch). 3 / 4 / 5 probe hits (risk
+  0 / 1 / 2; none = 2; risk 3 never decays) → class drops a tier (rewrite
+  provenance); epoch changed → recertify at provenance; probe fail →
+  QUARANTINE + sticky floor. One
   escalation = 2 failed acceptance runs at a tier ⇒ retry one tier up; 2
   escalations → raise default. Any acceptance failure while an entry was
   referenced → QUARANTINE it immediately.

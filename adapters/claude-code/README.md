@@ -12,8 +12,9 @@ The loop:
    the pattern (≤15 lines: invariants, order, the trap) into the
    `repo-playbook` skill — which is **preloaded into both executors**.
 3. Next occurrence of that class runs a **probe** one tier lower with the
-   entry in the brief. Two probe hits → the class's default tier drops
-   permanently. Decay iterates: T3 → T2 → T1.
+   entry in the brief. 3 / 4 / 5 probe hits (by the class's risk 0 / 1 / 2) →
+   the class's default tier drops. Decay iterates: T3 → T2 → T1. A model or
+   effort change re-certifies entries at their provenance tier first.
 4. Symmetric upgrade: two escalations raise a class's default. The rubric is
    the cold-start prior; the ledger is the posterior.
 
@@ -44,9 +45,12 @@ guard fails closed when Node.js is unavailable.
    to your repo root, then copy `core/MODELS.md` from the TierDecay checkout to
    `.tierdecay/MODELS.md` (create `.tierdecay/` if needed). **Merge existing
    files deliberately; do not overwrite learned state or hardened settings.**
-2. Four roles use two aliases: `opus` for the main thread, oracle, and heavy
-   executor; `sonnet` for the executor and scout. Check access and the resolved
-   model with your client's model controls; no plan availability is promised.
+2. Four roles use two aliases separated by effort: `opus` for the main thread,
+   oracle (`xhigh`), and heavy executor (`high`); `sonnet` for the executor
+   (`medium`) and scout (`low`). Check access and the resolved model with your
+   client's model controls; no plan availability is promised. Prefer the
+   [plugin](../../plugins/tierdecay/README.md) if you want `/plugin install`
+   instead of copied files.
 3. Start `claude`: the main thread runs the top tier via `.claude/settings.json`
    (`"model": "opus"`). Per-session override: `/model opus`.
 4. Configure thinking in your client as appropriate and verify that the agents
@@ -123,8 +127,10 @@ Claude Code ignores it for agents loaded from plugins.
   ALL subagents onto one model and destroys the tiering.
 
 ## Tuning
-- Scout and executor use `sonnet`; the main thread, oracle, and heavy executor
-  use `opus`. Keep this two-alias policy consistent across settings and agents.
+- Scout and executor use `sonnet` (`low` / `medium` effort); the main thread,
+  oracle, and heavy executor use `opus` (oracle `xhigh`, heavy executor
+  `high`). Keep this two-alias policy consistent across settings and agents;
+  effort is the per-role cost lever. An effort change is a new binding epoch.
 - **Aliases are the point.** `opus` and `sonnet` avoid pinning a provider version
   in every agent. Check the model resolved by your client at session start.
   Current bindings and pinning guidance live in one file:

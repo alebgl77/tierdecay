@@ -1,8 +1,15 @@
-# Synthetic routing replay
+# Benchmarks
+
+- [`pilot-v1/`](pilot-v1/RESULTS.md) — real Opus and Sonnet executor runs on a
+  controlled fixture repository with hidden acceptance tests. Small and
+  scoped; read its limitations.
+- `synthetic-v1.jsonl` — the regression fixture below.
+
+## Synthetic routing replay
 
 `synthetic-v1.jsonl` is a small, deterministic, deliberately synthetic fixture.
 It is not collected from users, does not estimate production savings, and is
-not a published real-workload benchmark.
+not a real-workload benchmark.
 
 Run it with a calibrated local config and the fixture state:
 

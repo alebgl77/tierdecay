@@ -4,9 +4,9 @@
 
 # TierDecay
 
-**The self-distilling model router for AI coding CLIs. It learns which recurring classes can move lower after successful probes.**
+**The per-repo learning layer for AI coding model routers. It learns which of *your* recurring task classes can safely run on a cheaper tier — and hands that to the router you already use.**
 
-*Solve recurring problem classes at the tier they need. Reuse verified patterns at a lower tier when probes pass.*
+*Native routers decide from population-wide signals. TierDecay adds the one signal they cannot see: your repo's own history of what passed where.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -23,6 +23,7 @@
 ![Cline](https://img.shields.io/badge/Cline-plan%2Fact-2ea043)
 ![Goose](https://img.shields.io/badge/Goose-AGENTS.md-00b3a4)
 ![Windsurf](https://img.shields.io/badge/Windsurf-AGENTS.md-06b6d4)
+![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757)
 
 <br/>
 
@@ -34,15 +35,30 @@
 
 ## The problem
 
-Many AI coding workflows face the same bad trade: burn frontier-model tokens
-on boilerplate, or watch a cheap model faceplant on hard problems. Static
-routing rubrics help — but repeatedly routing every task through a high tier
-can add avoidable cost. Your router knows nothing about *your* repo on task 1,
-and still knows nothing on task 500.
+Model routing is now built in: Cursor's router picks a model per request,
+Claude Code binds subagents to models and effort levels, Aider splits
+architect and editor. These routers decide from the request text and from
+signals pooled across every user. None of them remembers that *in your repo*
+`add-migration-store` has passed on the fast tier five times in a row — or
+that `fix-flaky-test-jest` failed there twice. On task 500 they know as little
+about your repo as on task 1.
+
+## Where TierDecay fits
+
+| | Native router (Cursor Auto, Claude Code subagents, …) | TierDecay |
+|---|---|---|
+| Learns from | the request, pooled usage across users | your repo's ledger: predicted vs. executed tier per task class |
+| Decides | which model serves this request | which **tier** a recurring class has earned, with what evidence |
+| Safety | provider heuristics | quarantine on any failure, sticky floors, confidence-gated decay, recertification on model/effort change |
+| Output | a model call | a routing table and Agent Skills **for** the native router (`tierdecay export`) |
+
+TierDecay does not proxy or replace the router. It is three Markdown files, a
+protocol, and an optional deterministic advisor that turns your history into
+per-class routes the router can follow.
 
 ## The idea
 
-**Routing should be a learning system.** TierDecay is three markdown files and
+**Routing should learn from your repo.** TierDecay is three markdown files and
 a protocol — no proxy, no daemon, no SDK:
 
 | File | Role | Analogy |
@@ -58,8 +74,11 @@ a protocol — no proxy, no daemon, no SDK:
 When an expensive model solves a hard problem, the orchestrator distills the
 *decisions* (invariants, ordering, the trap) into a ≤15-line playbook entry.
 The next occurrence of that problem class is **probed one tier lower** with
-the entry in context. Two hits → the class's default tier drops permanently.
-The router literally learns your repo's difficulty distribution.
+the entry in context. Enough passing probes — 3, 4, or 5 depending on the
+class's risk, the smallest counts that give 80% confidence in a 50/60/70% pass
+rate — and the class's default tier drops. A model or effort change sends the
+class back to re-certify. The router learns your repo's difficulty
+distribution, and only as fast as the evidence allows.
 
 ## How it works
 
@@ -68,6 +87,7 @@ The router literally learns your repo's difficulty distribution.
 ```mermaid
 flowchart TD
     A([New task]) --> B{Live playbook<br/>entry?}
+    B -- "yes, other epoch" --> R[RECERTIFY at provenance<br/>model or effort changed]
     B -- yes --> E[PROBE: one tier below provenance<br/>entry quoted in the brief]
     B -- no --> D{Class in<br/>ledger PRIORS?}
     D -- yes --> C[Use empirical default tier<br/><i>skip scoring entirely</i>]
@@ -76,7 +96,7 @@ flowchart TD
     G -- "0–3" --> T1[T1 — cheap executor]
     G -- "4–6" --> T2[T2 — heavy executor]
     G -- "≥7 or any axis maxed" --> T3[T3 — frontier specs<br/>T2 implements · T3 reviews]
-    E -- pass --> H[hits +1<br/>2 hits ⇒ tier drops for good]
+    E -- pass --> H[hits +1<br/>3/4/5 hits by risk ⇒ tier drops]
     E -- fail --> I[Entry quarantined<br/>sticky floor · escalate normally]
 ```
 
@@ -107,11 +127,13 @@ stateDiagram-v2
     [*] --> Scored: first occurrence (rubric)
     Scored --> Distilled: T2/T3 success on a recurring class
     Distilled --> Probing: next occurrence → tier −1
-    Probing --> Decayed: 2 probe hits
+    Probing --> Decayed: 3/4/5 probe hits (risk 0/1/2)
     Probing --> Quarantined: probe fails (sticky floor)
     Decayed --> Probing: probe the next tier down
     Quarantined --> Distilled: entry revised by orchestrator
     Scored --> Raised: 2 escalations → default tier +1
+    Decayed --> Recertifying: model or effort changed
+    Recertifying --> Probing: pass at provenance
 ```
 
 ## The economics
@@ -138,6 +160,31 @@ threshold already yields strict savings. Strict savings are impossible when
 when `C_distill = 0`. If `Δ = 0`, equality holds for every `n` when
 `C_distill = 0`; otherwise there is no weak break-even.
 
+### Measured: pilot v1
+
+[`benchmarks/pilot-v1`](benchmarks/pilot-v1/RESULTS.md) ran 36 real executor
+tasks (Opus and Sonnet) on a controlled fixture with hidden acceptance tests:
+three recurring classes, three instances each.
+
+| Route | Accepted | Cost per task (warm cache) |
+|---|---|---|
+| always frontier (`opus`) | 9 / 9 | 0.180 USD |
+| always fast tier (`sonnet`) | 15 / 15 | 0.117 USD |
+| TierDecay probe (`sonnet` + distilled entry) | 12 / 12 | 0.111 USD |
+
+The fast tier cost **0.66×** the frontier per task (95% interval 0.63–0.69) at
+equal acceptance. Replaying the protocol on those outcomes — first instance
+routed by the rubric, later ones probed — saves **24%** against
+always-frontier. The distilled entry itself added no significant saving over
+a cold fast-tier attempt (0.97×, interval 0.90–1.05); 11 of 12 probes flagged
+a step of it as inaccurate or inapplicable. Read: on classes the cheap tier can
+already do, the value is the *routing*; the playbook matters where the cheap
+tier fails without it — a regime this pilot did not reach. One fixture, small
+n, one author: the [limitations](benchmarks/pilot-v1/RESULTS.md#limitations)
+are spelled out.
+
+### Illustration
+
 Illustration only, not benchmark evidence: let `C_hi = 1`, `C_lo = 0.2`, and
 `C_distill = 0.1`, and assume every low-tier probe succeeds without failure or
 escalation cost.
@@ -151,7 +198,7 @@ escalation cost.
 
 Here `Δ = 0.8`, so both thresholds are `n ≥ 1`: the first reuse recovers the
 overhead for this illustration only. Failures or escalations would raise the
-realized cumulative cost above the table. TierDecay has no published benchmark.
+realized cumulative cost above the table.
 
 <div align="center">
 <img src="assets/economics.png" alt="A staircase of blocks stepping down from amber through teal to a long flat row of small green blocks — cost collapsing as classes decay to cheaper tiers" width="720" />
@@ -160,30 +207,31 @@ realized cumulative cost above the table. TierDecay has no published benchmark.
 Health metric: the `executed` column of your ledger should drift toward T1
 over time for recurring classes. **That drift is the product.**
 
-## Deterministic router (v0.3 development)
+## Deterministic advisor (v0.4)
 
-TierDecay now includes an optional local Node.js advisor over the same
-Markdown ledger and playbook. It has no runtime dependencies, network calls,
-daemon, clock, random source, or state-writing capability. The default
-`shadow` policy calculates recommendations while keeping the established
-protocol decision effective; `optimize` is never the default and must be
-explicitly enabled with a calibrated economic configuration.
+An optional local Node.js advisor reads the same Markdown ledger and playbook.
+No runtime dependencies, network calls, daemon, clock, or random source; it
+never writes the ledger or playbook.
 
 ```bash
-node bin/tierdecay.js route \
-  --request request.json \
-  --ledger .tierdecay/ledger.md \
-  --playbook .tierdecay/playbook.md \
-  --config .tierdecay/router-config.json \
-  --policy shadow
+tierdecay status                    # per class: route, hits vs. required, what the orchestrator owes
+tierdecay export --format claude    # routing table: class → agent, alias, effort (also: cursor, json)
+tierdecay export --format skills --out .claude/skills   # live entries as Agent Skills
+tierdecay route --request request.json --policy shadow  # one decision, with the optimized recommendation
+tierdecay bench --scenario outcomes.jsonl --config cfg.json --permutations 50   # order robustness
 ```
 
-The CLI also validates observation rows and performs sequential, reproducible
-replay when every executable tier has an explicit potential outcome. See the
-[router contract](core/ROUTER.md), [JSON schemas](core/schemas/), and the
-[synthetic replay fixture](benchmarks/README.md). The synthetic data is a
-regression fixture, not evidence from real workloads. **TierDecay still has no
-published real-workload benchmark and makes no universal savings claim.**
+(`node bin/tierdecay.js …` from a checkout; the Claude Code plugin puts
+`tierdecay` on the PATH.) `shadow` keeps the protocol's decision effective;
+`optimize` must be enabled explicitly with a calibrated economic configuration
+and fails closed to T3 until its statistical cells have enough samples.
+`bench` replays measured or hypothetical outcomes under seeded permutations
+with in-memory playbook evolution, because self-improving systems are path
+dependent and one replay order can flatter or hide a policy. See the
+[router contract](core/ROUTER.md), [JSON schemas](core/schemas/), the
+[pilot](benchmarks/pilot-v1/RESULTS.md), and the
+[synthetic regression fixture](benchmarks/README.md). **No universal savings
+claim.**
 
 ## Why it doesn't rot
 
@@ -195,11 +243,24 @@ self-poisoning. TierDecay ships with the antibodies:
 | Executor writes garbage into the playbook | Only the orchestrator writes config paths; VERIFY rejects any executor diff touching them — and the Claude Code adapter blocks it in-tool (guard hook + ask-gated writes) |
 | A bad pattern silently spreads | Any acceptance failure while an entry was referenced → instant QUARANTINE |
 | Playbook grows into context rot | Hard cap 150 lines; eviction = lowest hits, oldest first |
-| Over-eager downgrading | Downgrade requires 2 probe passes; a failed probe sets a **sticky floor** |
+| Over-eager downgrading | Downgrade needs 3 / 4 / 5 consecutive probe passes by risk (80% Clopper–Pearson); risk-3 work never decays; a failed probe sets a **sticky floor** |
+| A new model or effort level silently invalidates history | Entries carry their binding `epoch:`; a mismatch forces **recertification** at provenance before any further descent |
+| A lucky task order flatters the router | `tierdecay bench` replays under seeded permutations and reports the spread |
 | Over-eager distillation | One-offs are never distilled; "a wrong pattern costs more than no pattern" |
 | Rubric drifts from reality | It can't — it's only the cold-start prior; the ledger posterior overrides it both directions |
 
 ## Quick start
+
+**Claude Code — plugin (recommended):**
+
+```text
+/plugin marketplace add alebgl77/tierdecay
+/plugin install tierdecay@tierdecay
+/tierdecay:init          # in each project you opt in
+```
+
+See [`plugins/tierdecay`](plugins/tierdecay/README.md). Every other CLI — and
+Claude Code without the plugin — uses the installer below.
 
 For production, use only the
 [latest tagged release](https://github.com/alebgl77/tierdecay/releases/latest).
@@ -247,9 +308,11 @@ See the [native install and upgrade guide](adapters/claude-code/README.md).
 
 Copies `CLAUDE.md` + `.claude/` (4 subagents, 4 skills, the state-write guard
 hook, ledger) to your repo root, plus `.tierdecay/MODELS.md`. Four roles use
-two aliases: `opus` for the main thread, oracle, and heavy executor; `sonnet`
-for the executor and scout. Check model access in your client. The playbook is
-**preloaded** into both executors via the `skills:` frontmatter. See
+two aliases separated by effort: `opus` for the main thread, oracle (`xhigh`),
+and heavy executor (`high`); `sonnet` for the executor (`medium`) and scout
+(`low`). No tier uses the cheapest model family — by policy. Check model access
+in your client. The playbook is **preloaded** into both executors via the
+`skills:` frontmatter. Same content as the plugin, as copied files. See
 [`adapters/claude-code/`](adapters/claude-code/)
 and [`core/MODELS.md`](core/MODELS.md) for the current policy.
 </details>
@@ -286,19 +349,21 @@ controls: **Cline** binds T3 → Plan-mode model, T1 → Act-mode model;
 **Goose** binds T3 → the `/plan` planner model, T1/T2 → the default
 `GOOSE_MODEL`; **Windsurf** runs single-agent phase mode via its per-message
 model picker; **Cursor** reads `AGENTS.md` natively (root + nested) and maps
-tiers onto its per-conversation / per-surface model picker (or a Project Rule
-at `.cursor/rules/tierdecay.mdc`). See [`adapters/cline/`](adapters/cline/),
+tiers onto its router's Auto goals (T1 → Cost, T2 → Balance, T3 →
+Intelligence) or an explicit model pick (or a Project Rule at
+`.cursor/rules/tierdecay.mdc`); `tierdecay export --format cursor` prints the
+table. See [`adapters/cline/`](adapters/cline/),
 [`adapters/goose/`](adapters/goose/), [`adapters/windsurf/`](adapters/windsurf/),
 [`adapters/cursor/`](adapters/cursor/).
 </details>
 
 ## What TierDecay is not
 
-- **Not a proxy or a router daemon.** Zero infrastructure. It's markdown, a
-  protocol, and your CLI's own model-binding features.
-- **Not a benchmark press release.** We publish the *mechanism* and the
-  *measurement method* (your ledger). Post your real decay curves — that's
-  the only benchmark that matters.
+- **Not a proxy, a router daemon, or a competitor to your CLI's router.** Zero
+  infrastructure. It's markdown, a protocol, and your CLI's own model-binding
+  features — fed with a posterior they don't have.
+- **Not a benchmark press release.** One small pilot, with its limits stated.
+  Post your real decay curves — your ledger is the benchmark that matters.
 - **Not model-locked.** Tiers are roles. Map them to whatever frontier /
   mid / fast models your provider ships this month.
 
@@ -324,6 +389,19 @@ didn't author. Residual risk and threat model: [SECURITY.md](SECURITY.md).
 
 **Is this fine-tuning?** No weights change. It's *in-context distillation*:
 expensive reasoning compiled into instructions a cheaper model can follow.
+
+**Why is no tier bound to the cheapest model family?** Deliberate policy: the
+cheap end of the ladder is the fast workhorse at lower effort. Effort is a cost
+lever inside one model, one family per role keeps prompt caches and the
+posterior interpretable, and the executor tiers keep quality headroom. A test
+fails if any shipped binding drifts from it — see
+[`core/MODELS.md`](core/MODELS.md).
+
+**I already use Cursor's Auto / Claude Code's subagents. Why add this?** They
+choose per request from pooled signals. TierDecay remembers, per class, what
+actually passed in *your* repo, refuses to descend without evidence, and
+re-certifies when models change — then exports that as a table or as Agent
+Skills for the router you already use.
 
 ## Contributing
 

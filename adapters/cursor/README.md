@@ -29,7 +29,13 @@ Recent builds (Cursor 2.x/3) can expose **per-surface / per-mode default models*
 (Agent / Ask / Plan) — bind T3 to the Agent/Plan surface and a cheaper model to
 Ask where your build allows. Confirm the feature in your version; it's evolving.
 
-Tip: **don't use `Auto` model mode when you want the decay signal** — Auto picks
-a model per request, so the `executed` tier in your ledger stops reflecting a
-choice you made. Pick the tier explicitly, or accept that Auto-run rows are
-noise in the posterior.
+**Cursor's router (`Auto`).** Since Cursor split Auto into Cost / Balance /
+Intelligence goals (July 2026), TierDecay complements it rather than fighting
+it: bind T1 → Auto (Cost), T2 → Auto (Balance), T3 → Auto (Intelligence) or an
+explicit frontier model, and log the goal you chose as the `executed` tier.
+Cursor's router is trained across its whole user base; TierDecay contributes
+the per-repo, per-class posterior it cannot see. Generate the table with
+`node /path/to/tierdecay/bin/tierdecay.js export --format cursor`. The concrete
+model behind an Auto goal is Cursor's choice, so take measured costs from your
+Cursor usage view, not from the tier label. Confirm the goal names in your
+build; the feature is evolving.

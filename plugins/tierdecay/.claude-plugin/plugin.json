@@ -1,0 +1,19 @@
+{
+  "name": "tierdecay",
+  "version": "0.4.0",
+  "description": "Per-repo learning layer for Claude Code model routing: four tiered subagents bound by alias and effort, a routing ledger, a self-distilled playbook, confidence-gated tier decay, and a state-write guard.",
+  "author": {
+    "name": "Alexandre Beguel"
+  },
+  "homepage": "https://github.com/alebgl77/tierdecay",
+  "repository": "https://github.com/alebgl77/tierdecay",
+  "license": "MIT",
+  "keywords": [
+    "model-routing",
+    "subagents",
+    "cost",
+    "playbook",
+    "agent-skills",
+    "effort"
+  ]
+}

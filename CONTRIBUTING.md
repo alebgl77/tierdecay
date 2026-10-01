@@ -17,6 +17,9 @@ is welcome.
   `predicted`/`executed`/`outcome` columns) from your own repo. Real posteriors
   are the only benchmarks this project trusts. See "post your ledger, not ours"
   in the README.
+- **Extend the pilot** — add task classes the fast tier fails cold (the regime
+  where the playbook should matter and pilot v1 did not reach), or rerun it
+  with other models; `benchmarks/pilot-v1/RESULTS.md` explains the harness.
 
 ## Add an adapter
 
@@ -89,8 +92,16 @@ bash tests/test-installer.sh
 bash tests/test-routing-order.sh
 bash tests/test-guard.sh
 node tests/test-model-policy.js
-shellcheck install.sh tests/*.sh adapters/claude-code/.claude/hooks/tierdecay-guard.sh
+node tests/test-router.js
+node tests/test-posterior.js
+node scripts/build-plugin.js --check      # plugin generated from the adapter, in sync
+node benchmarks/pilot-v1/harness.js validate
+shellcheck install.sh tests/*.sh adapters/claude-code/.claude/hooks/tierdecay-guard.sh plugins/tierdecay/hooks/*.sh
 ```
+
+Editing `adapters/claude-code/` or `core/engine/`? Run
+`node scripts/build-plugin.js` and commit the regenerated `plugins/tierdecay/`
+files with your change.
 
 CI runs the suites on Ubuntu, macOS, and Windows with Git Bash. The guard
 suite invokes `tests/test-guard-windows.js` automatically on Windows; it is

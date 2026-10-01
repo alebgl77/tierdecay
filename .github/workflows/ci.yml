@@ -36,7 +36,11 @@ jobs:
           req=(README.md LICENSE CONTRIBUTING.md CODE_OF_CONDUCT.md package.json \
                core/SPEC.md core/ROUTER.md core/ledger.template.md \
                core/playbook.template.md core/router-config.template.json \
-               bin/tierdecay.js install.sh)
+               bin/tierdecay.js install.sh scripts/build-plugin.js \
+               .claude-plugin/marketplace.json \
+               plugins/tierdecay/.claude-plugin/plugin.json \
+               plugins/tierdecay/hooks/hooks.json \
+               benchmarks/pilot-v1/RESULTS.md)
           for f in "${req[@]}"; do
             [ -f "$f" ] || { echo "::error::missing required file $f"; exit 1; }
           done
@@ -69,6 +73,10 @@ jobs:
           [ -x install.sh ] || { echo "::error::install.sh is not executable (chmod +x)"; exit 1; }
           [ -x adapters/claude-code/.claude/hooks/tierdecay-guard.sh ] \
             || { echo "::error::integrity guard hook is not executable"; exit 1; }
+          for x in plugins/tierdecay/hooks/tierdecay-guard.sh plugins/tierdecay/hooks/session-start.sh \
+                   plugins/tierdecay/bin/tierdecay plugins/tierdecay/bin/tierdecay-init; do
+            [ -x "$x" ] || { echo "::error::$x is not executable"; exit 1; }
+          done
           echo "Executables OK."
 
       - name: Installer is idempotent (never clobbers learned state)
@@ -129,6 +137,52 @@ jobs:
             || { echo "::error::guard blocked a legitimate docs write (content-only mention)"; exit 1; }
           echo "Enforcement intact: guard blocks state writes (file + Bash), passes normal and content-only-mention writes."
 
+  plugin:
+    name: Claude Code plugin and pilot fixture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
+
+      - name: Plugin is generated from the adapter and in sync
+        run: |
+          set -euo pipefail
+          node scripts/build-plugin.js --check
+          for f in .claude-plugin/marketplace.json plugins/tierdecay/.claude-plugin/plugin.json plugins/tierdecay/hooks/hooks.json; do
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
+          done
+          python3 - <<'EOF'
+          import json
+          market = json.load(open('.claude-plugin/marketplace.json'))
+          plugin = json.load(open('plugins/tierdecay/.claude-plugin/plugin.json'))
+          package = json.load(open('package.json'))
+          entry = next(p for p in market['plugins'] if p['name'] == plugin['name'])
+          assert entry['source'] == './plugins/tierdecay', entry['source']
+          assert plugin['version'] == package['version'], (plugin['version'], package['version'])
+          print('marketplace -> plugin', plugin['name'], plugin['version'])
+          EOF
+
+      - name: Plugin init seeds state without overwriting, and the session hook scopes itself
+        run: |
+          set -euo pipefail
+          project="$(mktemp -d)"
+          root="$GITHUB_WORKSPACE/plugins/tierdecay"
+          out="$(CLAUDE_PLUGIN_ROOT="$root" CLAUDE_PROJECT_DIR="$project" "$root/hooks/session-start.sh")"
+          grep -q "not opted in" <<< "$out" || { echo "::error::session hook injected context into a non-opted project"; exit 1; }
+          CLAUDE_PROJECT_DIR="$project" "$root/bin/tierdecay-init"
+          echo "LEARNED" >> "$project/.claude/routing-ledger.md"
+          again="$(CLAUDE_PROJECT_DIR="$project" "$root/bin/tierdecay-init")"
+          grep -q "kept     .claude/routing-ledger.md" <<< "$again" || { echo "::error::re-init did not keep state"; exit 1; }
+          grep -q LEARNED "$project/.claude/routing-ledger.md" || { echo "::error::init clobbered learned state"; exit 1; }
+          context="$(CLAUDE_PLUGIN_ROOT="$root" CLAUDE_PROJECT_DIR="$project" "$root/hooks/session-start.sh")"
+          grep -q "Multi-Model Orchestration" <<< "$context" || { echo "::error::session hook did not load the protocol"; exit 1; }
+          (cd "$project" && "$root/bin/tierdecay" status >/dev/null)
+          echo "Plugin init and session hook OK."
+
+      - name: Pilot fixture hidden tests fail on baselines and pass on references
+        run: node benchmarks/pilot-v1/harness.js validate > /dev/null
+
   regressions:
     name: Regression suites on ${{ matrix.os }}
     strategy:
@@ -150,6 +204,7 @@ jobs:
           bash tests/test-guard.sh
           node tests/test-model-policy.js
           node tests/test-router.js
+          node tests/test-posterior.js
 
   conformance:
     name: Protocol conformance
@@ -189,13 +244,16 @@ jobs:
           set -euo pipefail
           # Tiers are roles. A named model version anywhere else is drift waiting
           # to happen: it goes stale the day a new model ships. core/MODELS.md is
-          # the single source of truth; CHANGELOG and examples/self-build are
-          # historical records (rewriting them would falsify a real ledger).
+          # the single source of truth (the plugin ships a generated copy);
+          # CHANGELOG, examples/self-build, and benchmarks/pilot-v1 are
+          # historical records (rewriting them would falsify measured runs).
           pattern='claude-(opus|sonnet|haiku|fable|mythos)-[0-9]|(Opus|Sonnet|Haiku|Fable|Mythos) [0-9]+\.?[0-9]*'
           if grep -rInE "$pattern" \
                --include='*.md' --include='*.yml' --include='*.yaml' \
                --include='*.json' --include='*.sh' . \
                | grep -v '^\./core/MODELS\.md:' \
+               | grep -v '^\./plugins/tierdecay/templates/MODELS\.md:' \
+               | grep -v '^\./benchmarks/pilot-v1/' \
                | grep -v '^\./CHANGELOG\.md:' \
                | grep -v '^\./examples/self-build/' \
                | grep -v '^\./\.github/workflows/ci\.yml:' ; then
@@ -301,7 +359,7 @@ jobs:
 
   release-readiness:
     name: Release readiness
-    needs: [lint, conformance, docs, install-matrix, regressions]
+    needs: [lint, plugin, conformance, docs, install-matrix, regressions]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
