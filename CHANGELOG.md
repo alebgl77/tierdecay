@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning][semver].
 
 ## [Unreleased]
 
+### Fixed
+
+- Tag backfills (`tag-release.yml` dispatch on an earlier commit) verify the
+  CI recorded on that commit instead of running today's suite against files
+  that predate it, and release tags that predate `core/engine/version.js` and
+  `scripts/sbom.js`; a tag-release run no longer repeats the full CI inside
+  the release workflow.
+
 ## [0.5.0] - 2026-10-01
 
 Every agent, production Linux: the same posterior and the same deterministic

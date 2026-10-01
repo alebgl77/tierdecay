@@ -70,17 +70,43 @@ jobs:
   verify:
     name: Full CI on the commit to tag
     needs: plan
-    if: needs.plan.outputs.create == 'true'
+    if: needs.plan.outputs.create == 'true' && github.event_name == 'push'
     uses: ./.github/workflows/ci.yml
     with:
       checkout_ref: ${{ needs.plan.outputs.sha }}
     permissions:
       contents: read
 
+  # A backfill targets an earlier commit whose files predate today's CI, so
+  # it relies on the CI that ran on that commit when it reached main.
+  verify-history:
+    name: Recorded CI on the commit to backfill
+    needs: plan
+    if: needs.plan.outputs.create == 'true' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read
+      contents: read
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.plan.outputs.sha }}
+        run: |
+          set -euo pipefail
+          runs="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs?per_page=100" \
+            --jq '.check_runs[] | "\(.status) \(.conclusion) \(.name)"')"
+          [ -n "$runs" ] || { echo "::error::no recorded CI on ${SHA}"; exit 1; }
+          echo "$runs"
+          bad="$(grep -vE '^completed (success|skipped|neutral) ' <<< "$runs" || true)"
+          [ -z "$bad" ] || { echo "::error::recorded CI on ${SHA} is not green:"; echo "$bad"; exit 1; }
+          echo "Recorded CI on ${SHA} is green ($(wc -l <<< "$runs") check runs)."
+
   tag:
     name: Create annotated tag
-    needs: [plan, verify]
-    if: needs.plan.outputs.create == 'true'
+    needs: [plan, verify, verify-history]
+    if: >-
+      !cancelled() && needs.plan.outputs.create == 'true' &&
+      (needs.verify.result == 'success' || needs.verify-history.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -103,9 +129,10 @@ jobs:
   release:
     name: Publish release
     needs: [plan, tag]
-    if: needs.plan.outputs.create == 'true'
+    if: ${{ !cancelled() && needs.tag.result == 'success' }}
     uses: ./.github/workflows/release.yml
     with:
       tag: ${{ needs.plan.outputs.tag }}
+      verified: true
     permissions:
       contents: write
