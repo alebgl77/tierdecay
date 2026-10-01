@@ -2,187 +2,212 @@
 'use strict';
 
 const fs = require('node:fs');
-const path = require('node:path');
 const { stableStringify, serialized } = require('../core/engine/canonical');
-const { CLASS_RE, TIERS, isIsoDate, parseLedger, parsePlaybook, observationRow } = require('../core/engine/markdown');
 const { route } = require('../core/engine/route');
 const { replay } = require('../core/engine/replay');
 const { status } = require('../core/engine/status');
-const { exportPosterior } = require('../core/engine/export');
+const { exportPosterior, FORMATS } = require('../core/engine/export');
 const { bench } = require('../core/engine/bench');
+const { doctor } = require('../core/engine/doctor');
+const { validateObservation, appendObservation } = require('../core/engine/observation');
+const { statePaths, loadState } = require('../core/engine/workspace');
+const { VERSION } = require('../core/engine/version');
+
+const COMMANDS = {
+  route: ['request', 'ledger', 'playbook', 'config', 'policy', 'root'],
+  observe: ['observation', 'append'],
+  replay: ['scenario', 'ledger', 'playbook', 'config', 'policy', 'root'],
+  status: ['ledger', 'playbook', 'epoch', 'root'],
+  export: ['format', 'out', 'ledger', 'playbook', 'epoch', 'root'],
+  bench: ['scenario', 'ledger', 'playbook', 'config', 'permutations', 'seed', 'root'],
+  doctor: ['ledger', 'playbook', 'config', 'epoch', 'root'],
+  mcp: ['ledger', 'playbook', 'config', 'root', 'allow-ledger-append'],
+  completion: ['shell']
+};
 
 function usage() {
-  return `TierDecay deterministic router v0.4.0
+  return `TierDecay v${VERSION} — per-repo learning layer for AI coding model routers
 
 Usage:
-  tierdecay route --request FILE [--ledger FILE] [--playbook FILE] [--config FILE] [--policy legacy|shadow|optimize]
-  tierdecay observe --observation FILE
-  tierdecay replay --scenario FILE [--ledger FILE] [--playbook FILE] --config FILE [--policy shadow|optimize]
-  tierdecay status [--ledger FILE] [--playbook FILE] [--epoch EPOCH]
-  tierdecay export --format json|claude|cursor|skills [--out DIR] [--ledger FILE] [--playbook FILE] [--epoch EPOCH]
-  tierdecay bench --scenario FILE --config FILE [--ledger FILE] [--playbook FILE] [--permutations N] [--seed S]
+  tierdecay route --request FILE [--policy legacy|shadow|optimize] [STATE]
+  tierdecay status [--epoch EPOCH] [STATE]
+  tierdecay export --format ${FORMATS.join('|')} [--out DIR] [--epoch EPOCH] [STATE]
+  tierdecay observe --observation FILE [--append LEDGER]
+  tierdecay replay --scenario FILE --config FILE [--policy shadow|optimize] [STATE]
+  tierdecay bench --scenario FILE --config FILE [--permutations N] [--seed S] [STATE]
+  tierdecay doctor [--epoch EPOCH] [STATE]
+  tierdecay mcp [--allow-ledger-append true] [STATE]
+  tierdecay completion --shell bash
+  tierdecay --version | --help
 
-FILE may be - for stdin (once). Defaults use .tierdecay/{ledger.md,playbook.md,router-config.json},
-or the native .claude/routing-ledger.md and .claude/skills/repo-playbook/SKILL.md when only those exist.
-Output is canonical JSON without timestamps; observe outputs one validated Markdown row;
-export --format claude|cursor outputs a Markdown routing table; export --format skills writes
-Agent Skills for live playbook entries under --out and never touches the ledger or playbook.`;
+STATE: [--root DIR] [--ledger FILE] [--playbook FILE] [--config FILE]. Defaults resolve
+from --root (default: cwd): .tierdecay/{ledger.md,playbook.md,router-config.json}, or the
+native .claude/routing-ledger.md and .claude/skills/repo-playbook/SKILL.md when only those
+exist. FILE may be - for stdin (once).
+
+Output is canonical JSON without timestamps; observe prints one validated Markdown row
+(--append inserts it into a measured ledger atomically under a lock); export
+--format claude|codex|antigravity|cursor prints a Markdown routing table; --format skills
+writes Agent Skills for live playbook entries under --out; mcp serves the same logic to any
+MCP client over stdio (read-only unless --allow-ledger-append true).
+
+Exit codes: 0 ok · 1 doctor found failures · 2 invalid input · 3 incoherent or locked state ·
+4 replay missing potential outcomes · 5 internal error.`;
+}
+
+function fail(message, exitCode = 2) {
+  return Object.assign(new Error(message), { exitCode });
 }
 
 function argumentsOf(argv) {
   const command = argv[0];
-  if (!['route', 'observe', 'replay', 'status', 'export', 'bench'].includes(command)) throw Object.assign(new Error(usage()), { exitCode: 2 });
+  if (!Object.prototype.hasOwnProperty.call(COMMANDS, command)) throw fail(`unknown command: ${command}\n${usage()}`);
   const options = {};
   for (let index = 1; index < argv.length; index += 2) {
     const key = argv[index];
     const value = argv[index + 1];
-    if (!key?.startsWith('--') || value === undefined) throw Object.assign(new Error(`invalid arguments\n${usage()}`), { exitCode: 2 });
-    if (options[key.slice(2)] !== undefined) throw Object.assign(new Error(`duplicate option: ${key}`), { exitCode: 2 });
-    options[key.slice(2)] = value;
+    if (!key?.startsWith('--') || value === undefined) throw fail(`invalid arguments\n${usage()}`);
+    const name = key.slice(2);
+    if (!COMMANDS[command].includes(name)) throw fail(`unknown option: --${name}`);
+    if (options[name] !== undefined) throw fail(`duplicate option: --${name}`);
+    options[name] = value;
   }
   return { command, options };
 }
 
 let stdinCache;
-function read(file, required = true) {
-  if (!file) {
-    if (required) throw Object.assign(new Error('missing required file option'), { exitCode: 2 });
-    return null;
-  }
+function read(file) {
+  if (!file) throw fail('missing required file option');
   if (file === '-') {
-    if (stdinCache !== undefined) throw Object.assign(new Error('stdin may be consumed only once'), { exitCode: 2 });
+    if (stdinCache !== undefined) throw fail('stdin may be consumed only once');
     stdinCache = fs.readFileSync(0, 'utf8');
     return stdinCache;
   }
   return fs.readFileSync(file, 'utf8');
 }
 
-function json(file, required = true) {
-  const source = read(file, required);
-  if (source === null) return null;
+function json(file) {
+  const source = read(file);
   try { return JSON.parse(source); }
-  catch (error) { throw Object.assign(new Error(`invalid JSON in ${file}: ${error.message}`), { exitCode: 2 }); }
+  catch (error) { throw fail(`invalid JSON in ${file}: ${error.message}`); }
 }
 
-function defaultFile(name) {
-  return path.join(process.cwd(), '.tierdecay', name);
+function integer(value, label) {
+  if (value === undefined) return undefined;
+  if (!/^(0|[1-9][0-9]*)$/.test(value)) throw fail(`${label} must be a non-negative integer`);
+  return Number(value);
+}
+
+function boolean(value, label) {
+  if (value === undefined) return false;
+  if (value !== 'true' && value !== 'false') throw fail(`${label} must be true or false`);
+  return value === 'true';
 }
 
 function output(value) {
   process.stdout.write(`${stableStringify(serialized(value))}\n`);
 }
 
-// Non-native adapters keep state in .tierdecay/; the native Claude Code
-// adapter and plugin keep it in .claude/. Explicit options always win.
-function defaultStatePaths() {
-  const nativeLedger = path.join(process.cwd(), '.claude', 'routing-ledger.md');
-  if (!fs.existsSync(defaultFile('ledger.md')) && fs.existsSync(nativeLedger)) {
-    return { ledger: nativeLedger, playbook: path.join(process.cwd(), '.claude', 'skills', 'repo-playbook', 'SKILL.md') };
-  }
-  return { ledger: defaultFile('ledger.md'), playbook: defaultFile('playbook.md') };
+function where(options) {
+  return statePaths(options.root, { ledger: options.ledger, playbook: options.playbook, config: options.config });
 }
 
-function state(options) {
-  const defaults = defaultStatePaths();
-  const ledger = parseLedger(read(options.ledger || defaults.ledger));
-  const playbookText = read(options.playbook || defaults.playbook);
-  const playbook = parsePlaybook(playbookText);
-  return { ledger, playbook, playbookText };
+function stateOf(options) {
+  const paths = where(options);
+  if (options.ledger === '-' || options.playbook === '-') {
+    const playbookText = options.playbook === '-' ? read('-') : fs.readFileSync(paths.playbook, 'utf8');
+    const { parseLedger, parsePlaybook } = require('../core/engine/markdown');
+    return { ledger: parseLedger(options.ledger === '-' ? read('-') : fs.readFileSync(paths.ledger, 'utf8')), playbook: parsePlaybook(playbookText), playbookText };
+  }
+  return loadState(paths);
 }
 
-function integer(value, label) {
-  if (value === undefined) return undefined;
-  if (!/^(0|[1-9][0-9]*)$/.test(value)) throw Object.assign(new Error(`${label} must be a non-negative integer`), { exitCode: 2 });
-  return Number(value);
+const BASH_COMPLETION = `# bash completion for tierdecay — source it, or install it as
+# /etc/bash_completion.d/tierdecay (or ~/.local/share/bash-completion/completions/tierdecay)
+_tierdecay() {
+  local cur prev
+  cur="\${COMP_WORDS[COMP_CWORD]}"
+  prev="\${COMP_WORDS[COMP_CWORD-1]}"
+  if [ "$COMP_CWORD" -eq 1 ]; then
+    COMPREPLY=( $(compgen -W "${Object.keys(COMMANDS).join(' ')} --help --version" -- "$cur") )
+    return
+  fi
+  case "$prev" in
+    --format) COMPREPLY=( $(compgen -W "${FORMATS.join(' ')}" -- "$cur") ); return ;;
+    --policy) COMPREPLY=( $(compgen -W "legacy shadow optimize" -- "$cur") ); return ;;
+    --shell) COMPREPLY=( $(compgen -W "bash" -- "$cur") ); return ;;
+    --allow-ledger-append) COMPREPLY=( $(compgen -W "true false" -- "$cur") ); return ;;
+    --out|--root) COMPREPLY=( $(compgen -d -- "$cur") ); return ;;
+    --request|--ledger|--playbook|--config|--scenario|--observation|--append)
+      COMPREPLY=( $(compgen -f -- "$cur") ); return ;;
+  esac
+  case "\${COMP_WORDS[1]}" in
+${Object.entries(COMMANDS).map(([name, flags]) => `    ${name}) COMPREPLY=( $(compgen -W "${flags.map((flag) => `--${flag}`).join(' ')}" -- "$cur") ) ;;`).join('\n')}
+  esac
 }
-
-function validateObservation(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw Object.assign(new Error('observation must be an object'), { exitCode: 2 });
-  const allowed = new Set(['date', 'class', 'predicted', 'executed', 'outcome', 'escalations', 'playbook', 'obsId', 'resourceCost', 'failures', 'incidentLoss', 'risk', 'epoch']);
-  for (const key of Object.keys(value)) if (!allowed.has(key)) throw Object.assign(new Error(`unknown observation property: ${key}`), { exitCode: 2 });
-  for (const key of allowed) if (!(key in value)) throw Object.assign(new Error(`missing observation property: ${key}`), { exitCode: 2 });
-  for (const key of ['date', 'class', 'predicted', 'executed', 'outcome', 'playbook', 'obsId', 'epoch']) {
-    if (typeof value[key] !== 'string') throw Object.assign(new Error(`${key} must be a JSON string`), { exitCode: 2 });
-  }
-  if (!isIsoDate(value.date)) throw Object.assign(new Error('date must be a valid YYYY-MM-DD date'), { exitCode: 2 });
-  if (!CLASS_RE.test(value.class)) throw Object.assign(new Error('class must be an exact 2-4 token signature'), { exitCode: 2 });
-  if (!TIERS.has(value.predicted) || !TIERS.has(value.executed)) throw Object.assign(new Error('predicted and executed must be T1, T2, or T3'), { exitCode: 2 });
-  if (!value.outcome) throw Object.assign(new Error('outcome must be non-empty'), { exitCode: 2 });
-  if (value.playbook !== '—' && !/^PB-[1-9][0-9]*$/.test(value.playbook)) throw Object.assign(new Error('playbook must be PB-n or —'), { exitCode: 2 });
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(value.obsId)) throw Object.assign(new Error('obsId is invalid or empty'), { exitCode: 2 });
-  if (!value.epoch || /\s/.test(value.epoch)) throw Object.assign(new Error('epoch must be a non-empty token'), { exitCode: 2 });
-  const numerics = [
-    ['resourceCost', 'resource_cost', false], ['failures', 'failures', true],
-    ['incidentLoss', 'incident_loss', false], ['risk', 'risk', true],
-    ['escalations', 'esc', true]
-  ];
-  for (const [key, label, integer] of numerics) {
-    if (typeof value[key] !== 'number' || !Number.isFinite(value[key])) {
-      throw Object.assign(new Error(`${label} must be a finite JSON number`), { exitCode: 2 });
-    }
-    if (integer && (!Number.isInteger(value[key]) || value[key] < 0)) throw Object.assign(new Error(`${label} must be a non-negative integer`), { exitCode: 2 });
-    if (integer && !Number.isSafeInteger(value[key])) throw Object.assign(new Error(`${label} exceeds the safe integer range`), { exitCode: 2 });
-    if (!integer && value[key] < 0) throw Object.assign(new Error(`${label} must be finite and non-negative`), { exitCode: 2 });
-  }
-  if (value.risk > 3) throw Object.assign(new Error('risk must be between 0 and 3'), { exitCode: 2 });
-  if (value.outcome === 'pass' && value.failures !== 0) throw Object.assign(new Error('pass observation must have zero failures'), { exitCode: 2 });
-  if (value.outcome === 'fail' && value.failures === 0) throw Object.assign(new Error('fail observation must have failures'), { exitCode: 2 });
-  try {
-    const row = observationRow(value);
-    const header = '| date | class | predicted | executed | outcome | esc | playbook | obs_id | resource_cost | failures | incident_loss | risk | epoch |';
-    const separator = '|---|---|---|---|---|---|---|---|---|---|---|---|---|';
-    parseLedger(`# Routing Ledger\n\n## LOG\n\n${header}\n${separator}\n${row}\n`);
-    return row;
-  } catch (error) {
-    error.exitCode = 2;
-    throw error;
-  }
-}
+complete -F _tierdecay tierdecay
+`;
 
 function main(argv) {
-  if (argv.includes('--help') || argv.includes('-h') || argv.length === 0) {
+  if (argv.length === 0 || argv.includes('--help') || argv.includes('-h')) {
     process.stdout.write(`${usage()}\n`);
     return;
   }
-  const { command, options } = argumentsOf(argv);
-  if (command === 'observe') {
-    const allowed = new Set(['observation']);
-    for (const key of Object.keys(options)) if (!allowed.has(key)) throw Object.assign(new Error(`unknown option: --${key}`), { exitCode: 2 });
-    process.stdout.write(`${validateObservation(json(options.observation))}\n`);
+  if (argv[0] === '--version' || argv[0] === '-V') {
+    process.stdout.write(`${VERSION}\n`);
     return;
   }
-  const allowedByCommand = {
-    route: ['request', 'ledger', 'playbook', 'config', 'policy'],
-    replay: ['scenario', 'ledger', 'playbook', 'config', 'policy'],
-    status: ['ledger', 'playbook', 'epoch'],
-    export: ['format', 'out', 'ledger', 'playbook', 'epoch'],
-    bench: ['scenario', 'ledger', 'playbook', 'config', 'permutations', 'seed']
-  };
-  const allowed = new Set(allowedByCommand[command]);
-  for (const key of Object.keys(options)) if (!allowed.has(key)) throw Object.assign(new Error(`unknown option: --${key}`), { exitCode: 2 });
-  const { ledger, playbook, playbookText } = state(options);
+  const { command, options } = argumentsOf(argv);
+
+  if (command === 'completion') {
+    if ((options.shell || 'bash') !== 'bash') throw fail('only --shell bash is supported');
+    process.stdout.write(BASH_COMPLETION);
+    return;
+  }
+  if (command === 'observe') {
+    const observation = json(options.observation);
+    if (options.append) output(appendObservation(options.append, observation));
+    else process.stdout.write(`${validateObservation(observation)}\n`);
+    return;
+  }
+  if (command === 'doctor') {
+    const report = doctor({ root: options.root, overrides: { ledger: options.ledger, playbook: options.playbook, config: options.config }, epoch: options.epoch });
+    output(report);
+    if (!report.healthy) process.exitCode = 1;
+    return;
+  }
+  if (command === 'mcp') {
+    const { serve } = require('../core/engine/mcp');
+    serve({
+      root: options.root,
+      overrides: { ledger: options.ledger, playbook: options.playbook, config: options.config },
+      allowAppend: boolean(options['allow-ledger-append'], '--allow-ledger-append')
+    });
+    return;
+  }
+
+  const paths = where(options);
+  const { ledger, playbook, playbookText } = stateOf(options);
   if (command === 'status') {
     output(status({ ledger, playbook, epoch: options.epoch }));
   } else if (command === 'export') {
-    if (!options.format) throw Object.assign(new Error('export requires --format'), { exitCode: 2 });
-    if (options.out && options.format !== 'skills') throw Object.assign(new Error('--out is only valid with --format skills'), { exitCode: 2 });
+    if (!options.format) throw fail('export requires --format');
+    if (options.out && options.format !== 'skills') throw fail('--out is only valid with --format skills');
     const result = exportPosterior({ ledger, playbook, playbookText, epoch: options.epoch, format: options.format, out: options.out });
     if (result.kind === 'json') output(result.value);
     else process.stdout.write(result.value);
   } else if (command === 'bench') {
-    const config = json(options.config || defaultFile('router-config.json'));
     output(bench({
-      jsonl: read(options.scenario), ledger, playbook, config,
+      jsonl: read(options.scenario), ledger, playbook, config: json(options.config || paths.config),
       permutations: integer(options.permutations, 'permutations') ?? 20,
       seed: integer(options.seed, 'seed') ?? 1
     }));
   } else if (command === 'route') {
     const policy = options.policy || 'shadow';
-    const config = policy === 'legacy' ? null : json(options.config || defaultFile('router-config.json'));
+    const config = policy === 'legacy' ? null : json(options.config || paths.config);
     output(route({ request: json(options.request), ledger, playbook, config, policy }));
   } else {
-    const config = json(options.config || defaultFile('router-config.json'));
-    output(replay({ jsonl: read(options.scenario), ledger, playbook, config, policy: options.policy || 'shadow' }));
+    output(replay({ jsonl: read(options.scenario), ledger, playbook, config: json(options.config || paths.config), policy: options.policy || 'shadow' }));
   }
 }
 

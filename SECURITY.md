@@ -107,6 +107,13 @@ precise about which layer you are relying on:
    ship permission rules either: add the two `ask` rules yourself
    (`tierdecay-init` prints them). Run the active-hook smoke check against the
    plugin too.
+   **MCP server:** `tierdecay mcp` is read-only by default — every tool is
+   annotated `readOnlyHint` and none writes. The single write tool,
+   `tierdecay_record`, exists only when the server is started with
+   `--allow-ledger-append true`; MCP tools are visible to every agent in a
+   client session, so enable it only for the orchestrator's own session. The
+   append itself validates the row, rejects duplicates, and writes atomically
+   under an exclusive lock.
 3. **Human:** review state diffs like code (see above), and treat an
    unexpected prompt to approve a state write as a red flag — that prompt IS
    the alarm going off.

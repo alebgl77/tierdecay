@@ -40,7 +40,10 @@ jobs:
                .claude-plugin/marketplace.json \
                plugins/tierdecay/.claude-plugin/plugin.json \
                plugins/tierdecay/hooks/hooks.json \
-               benchmarks/pilot-v1/RESULTS.md)
+               benchmarks/pilot-v1/RESULTS.md ROADMAP.md Dockerfile action.yml \
+               core/engine/mcp.js scripts/build-diagrams.js \
+               docs/diagrams/architecture.svg docs/diagrams/routing-decision.svg \
+               docs/diagrams/decay-lifecycle.svg)
           for f in "${req[@]}"; do
             [ -f "$f" ] || { echo "::error::missing required file $f"; exit 1; }
           done
@@ -183,6 +186,57 @@ jobs:
       - name: Pilot fixture hidden tests fail on baselines and pass on references
         run: node benchmarks/pilot-v1/harness.js validate > /dev/null
 
+      - name: Diagrams are generated from scripts/build-diagrams.js and in sync
+        run: node scripts/build-diagrams.js --check
+
+  container:
+    name: OCI image (distroless, nonroot, read-only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
+
+      - name: Build and exercise the image
+        run: |
+          set -euo pipefail
+          docker build -t tierdecay:ci .
+          [ "$(docker run --rm tierdecay:ci --version)" = "$(node -p 'require("./package.json").version')" ]
+          [ "$(docker image inspect tierdecay:ci --format '{{.Config.User}}')" = nonroot ]
+          docker run --rm --read-only --network none -v "$PWD/benchmarks/pilot-v1:/work:ro" tierdecay:ci \
+            doctor --ledger state/ledger.md --playbook state/playbook.md --config pilot-v1.config.json > doctor.json
+          node -e 'const r=require("./doctor.json"); if (!r.healthy) { console.error(r); process.exit(1); } console.log("doctor healthy:", JSON.stringify(r.summary))'
+          reply="$(printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}' \
+            | docker run --rm -i --read-only --network none -v "$PWD/benchmarks/pilot-v1:/work:ro" tierdecay:ci \
+              mcp --ledger state/ledger.md --playbook state/playbook.md)"
+          grep -q '"protocolVersion":"2025-06-18"' <<< "$reply" || { echo "::error::MCP initialize failed in the container: $reply"; exit 1; }
+          echo "Container OK."
+
+  action:
+    name: GitHub Action self-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
+
+      - id: doctor
+        uses: ./
+        with:
+          root: benchmarks/pilot-v1
+          ledger: state/ledger.md
+          playbook: state/playbook.md
+          config: pilot-v1.config.json
+
+      - name: Outputs are wired
+        env:
+          HEALTHY: ${{ steps.doctor.outputs.healthy }}
+          REPORT: ${{ steps.doctor.outputs.report }}
+        run: |
+          set -euo pipefail
+          [ "$HEALTHY" = true ] || { echo "::error::expected a healthy pilot state"; exit 1; }
+          [ -s "$REPORT" ] || { echo "::error::report output is empty"; exit 1; }
+
   regressions:
     name: Regression suites on ${{ matrix.os }}
     strategy:
@@ -205,6 +259,7 @@ jobs:
           node tests/test-model-policy.js
           node tests/test-router.js
           node tests/test-posterior.js
+          node tests/test-production.js
 
   conformance:
     name: Protocol conformance
@@ -359,7 +414,7 @@ jobs:
 
   release-readiness:
     name: Release readiness
-    needs: [lint, plugin, conformance, docs, install-matrix, regressions]
+    needs: [lint, plugin, container, action, conformance, docs, install-matrix, regressions]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:

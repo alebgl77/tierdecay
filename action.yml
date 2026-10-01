@@ -1,0 +1,81 @@
+name: TierDecay doctor
+description: Gate CI on the health of a repository's TierDecay routing state (ledger, playbook, cap, permissions, config, owed bookkeeping).
+author: Alexandre Beguel
+branding:
+  icon: trending-down
+  color: orange
+
+inputs:
+  root:
+    description: Project root that holds .tierdecay/ or .claude/ routing state.
+    required: false
+    default: "."
+  ledger:
+    description: Explicit ledger path, relative to root.
+    required: false
+    default: ""
+  playbook:
+    description: Explicit playbook path, relative to root.
+    required: false
+    default: ""
+  config:
+    description: Explicit router config path, relative to root.
+    required: false
+    default: ""
+  epoch:
+    description: Current model/effort binding epoch (enables recertification checks).
+    required: false
+    default: ""
+  fail-on-warn:
+    description: Fail the step on warnings as well as failures.
+    required: false
+    default: "false"
+
+outputs:
+  healthy:
+    description: "true when no check failed."
+    value: ${{ steps.doctor.outputs.healthy }}
+  report:
+    description: Path to the JSON report.
+    value: ${{ steps.doctor.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - id: doctor
+      shell: bash
+      env:
+        TD_ROOT: ${{ inputs.root }}
+        TD_LEDGER: ${{ inputs.ledger }}
+        TD_PLAYBOOK: ${{ inputs.playbook }}
+        TD_CONFIG: ${{ inputs.config }}
+        TD_EPOCH: ${{ inputs.epoch }}
+        TD_FAIL_ON_WARN: ${{ inputs.fail-on-warn }}
+      run: |
+        set -euo pipefail
+        args=(doctor --root "$TD_ROOT")
+        [ -n "$TD_LEDGER" ] && args+=(--ledger "$TD_LEDGER")
+        [ -n "$TD_PLAYBOOK" ] && args+=(--playbook "$TD_PLAYBOOK")
+        [ -n "$TD_CONFIG" ] && args+=(--config "$TD_CONFIG")
+        [ -n "$TD_EPOCH" ] && args+=(--epoch "$TD_EPOCH")
+        report="$RUNNER_TEMP/tierdecay-doctor.json"
+        code=0
+        node "$GITHUB_ACTION_PATH/bin/tierdecay.js" "${args[@]}" > "$report" || code=$?
+        [ "$code" -le 1 ] || { cat "$report" >&2 || true; exit "$code"; }
+        node -e '
+          const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+          const icon = { ok: "✅", warn: "⚠️", fail: "❌" };
+          const rows = r.checks.map((c) => `| ${icon[c.status]} | \`${c.id}\` | ${c.detail.replace(/\|/g, "\\|")} |`);
+          process.stdout.write(`### TierDecay doctor — ${r.healthy ? "healthy" : "unhealthy"}\n\n| | check | detail |\n|---|---|---|\n${rows.join("\n")}\n`);
+        ' "$report" >> "$GITHUB_STEP_SUMMARY"
+        healthy="$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).healthy' "$report")"
+        warnings="$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).summary.warn' "$report")"
+        {
+          echo "healthy=$healthy"
+          echo "report=$report"
+        } >> "$GITHUB_OUTPUT"
+        [ "$healthy" = true ] || { echo "::error::TierDecay doctor found failing checks (see the job summary)"; exit 1; }
+        if [ "$TD_FAIL_ON_WARN" = true ] && [ "$warnings" != 0 ]; then
+          echo "::error::TierDecay doctor reported $warnings warning(s) and fail-on-warn is set"
+          exit 1
+        fi

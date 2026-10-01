@@ -21,6 +21,18 @@ const BINDINGS = Object.freeze({
     T1: { agent: 'executor', model: 'sonnet', effort: 'medium' },
     T0: { agent: 'scout', model: 'sonnet', effort: 'low' }
   },
+  codex: {
+    T3: { profile: 'tierdecay-t3', effort: 'xhigh', model: 'frontier coding model' },
+    T2: { profile: 'tierdecay-t2', effort: 'high', model: 'frontier coding model' },
+    T1: { profile: 'tierdecay-t1', effort: 'medium', model: 'fast coding model' },
+    T0: { profile: 'tierdecay-t0', effort: 'low', model: 'fast coding model' }
+  },
+  antigravity: {
+    T3: { mode: 'Planning', model: 'frontier model (Pro / Opus class)' },
+    T2: { mode: 'Planning', model: 'strong model' },
+    T1: { mode: 'Fast', model: 'fast model (Flash / Sonnet class)' },
+    T0: { mode: 'Fast', model: 'fast model, read-only' }
+  },
   cursor: {
     T3: { mode: 'Auto (Intelligence) or your frontier model' },
     T2: { mode: 'Auto (Balance)' },
@@ -33,7 +45,7 @@ const BINDINGS = Object.freeze({
   }
 });
 
-const FORMATS = ['json', 'claude', 'cursor', 'skills'];
+const FORMATS = ['json', 'claude', 'codex', 'antigravity', 'cursor', 'skills'];
 const SKILL_PREFIX = 'tierdecay-';
 const GENERATED_MARKER = 'generated-by: tierdecay';
 
@@ -71,6 +83,22 @@ function exportClaude(state) {
   return `# TierDecay routes (Claude Code)\n\n${table(['class', 'tier', 'agent', 'model', 'effort', 'why'], rows)}\n\n${FOOTER}\n`;
 }
 
+function exportCodex(state) {
+  const rows = routes(state).map((route) => {
+    const binding = BINDINGS.codex[route.tier];
+    return [`\`${route.class}\``, route.tier, `\`codex --profile ${binding.profile}\``, `\`${binding.effort}\``, why(route)];
+  });
+  return `# TierDecay routes (Codex)\n\nRun each task with the profile its tier maps to (profiles: \`.codex/config.toml\` from the TierDecay Codex adapter).\n\n${table(['class', 'tier', 'command', 'reasoning effort', 'why'], rows)}\n\n${FOOTER}\n`;
+}
+
+function exportAntigravity(state) {
+  const rows = routes(state).map((route) => {
+    const binding = BINDINGS.antigravity[route.tier];
+    return [`\`${route.class}\``, route.tier, binding.mode, binding.model, why(route)];
+  });
+  return `# TierDecay routes (Antigravity)\n\nStart the conversation that carries the task in this agent mode, with this model class.\n\n${table(['class', 'tier', 'agent mode', 'model', 'why'], rows)}\n\n${FOOTER}\n`;
+}
+
 function exportCursor(state) {
   const rows = routes(state).map((route) => [`\`${route.class}\``, route.tier, BINDINGS.cursor[route.tier].mode, why(route)]);
   return `# TierDecay routes (Cursor)\n\nPick the Cursor model or Auto goal for the conversation that carries the task.\n\n${table(['class', 'tier', 'Cursor model / Auto goal', 'why'], rows)}\n\n${FOOTER}\n`;
@@ -84,6 +112,8 @@ function exportJson(state) {
     routes: routes(state).map((route) => ({
       ...route,
       claude: BINDINGS.claude[route.tier],
+      codex: BINDINGS.codex[route.tier],
+      antigravity: BINDINGS.antigravity[route.tier],
       cursor: BINDINGS.cursor[route.tier],
       generic: BINDINGS.generic[route.tier]
     }))
@@ -159,7 +189,8 @@ function exportPosterior({ ledger, playbook, playbookText, epoch, format, out })
   if (format === 'skills') return { kind: 'json', value: exportSkills(playbook, playbookText, out) };
   const state = status({ ledger, playbook, epoch });
   if (format === 'json') return { kind: 'json', value: exportJson(state) };
-  return { kind: 'text', value: format === 'claude' ? exportClaude(state) : exportCursor(state) };
+  const render = { claude: exportClaude, codex: exportCodex, antigravity: exportAntigravity, cursor: exportCursor }[format];
+  return { kind: 'text', value: render(state) };
 }
 
 module.exports = { BINDINGS, FORMATS, exportPosterior, skillName };
