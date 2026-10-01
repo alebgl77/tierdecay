@@ -4,6 +4,7 @@ const { canonicalHash, serialized } = require('./canonical');
 const { ValidationError, validateConfig, metricLoss, ensureFinite } = require('./statistics');
 const { route, validateRequest } = require('./route');
 const { isIsoDate } = require('./markdown');
+const { requiredHits, DEFAULT_ENTRY_RISK } = require('./decay');
 
 const DEFAULT_REPLAY_DATE = '1970-01-01';
 
@@ -41,7 +42,40 @@ function validateOutcome(value, label, config) {
   return value;
 }
 
-function replay({ jsonl, ledger, playbook, config, policy = 'shadow' }) {
+// In-memory playbook evolution (opt-in): applies the orchestrator's DISTILL
+// bookkeeping to a working copy after each scenario, exactly as SPEC §4–5 ask:
+// a failure while an entry is referenced quarantines it and records the failed
+// tier as its sticky floor; a pass adds a hit; enough hits for the entry's risk
+// rewrite provenance to the tier that passed; a passing recertification adopts
+// the current epoch. Markdown files are never written.
+function evolve(entries, request, decision, chosen) {
+  if (!request.playbook) return null;
+  const entry = entries.find((candidate) => candidate.id === request.playbook);
+  if (!entry || entry.status !== 'live') return null;
+  const tier = decision.effective.tier;
+  if (chosen.failures > 0) {
+    entry.status = 'quarantined';
+    if (!entry.floor || Number(tier[1]) > Number(entry.floor[1])) entry.floor = tier;
+    if (Number(entry.floor[1]) > Number(entry.provenance[1])) entry.floor = entry.provenance;
+    return 'quarantine';
+  }
+  if (decision.effective.action === 'recertify') {
+    entry.bindingEpoch = request.epoch;
+    entry.hits = 0;
+    return 'recertified';
+  }
+  if (!['probe', 'exploit'].includes(decision.effective.action)) return null;
+  entry.hits += 1;
+  const needed = requiredHits(entry.risk === undefined ? DEFAULT_ENTRY_RISK : entry.risk);
+  if (decision.effective.action === 'probe' && needed !== null && entry.hits >= needed && Number(tier[1]) < Number(entry.provenance[1])) {
+    entry.provenance = tier;
+    entry.hits = 0;
+    return 'decay';
+  }
+  return 'hit';
+}
+
+function replay({ jsonl, ledger, playbook, config, policy = 'shadow', evolvePlaybook = false }) {
   const checkedConfig = validateConfig(config);
   if (!checkedConfig.enabled || !checkedConfig.calibrated) throw new ValidationError('replay requires enabled calibrated config');
   const scenarios = parseJsonLines(jsonl);
@@ -53,6 +87,8 @@ function replay({ jsonl, ledger, playbook, config, policy = 'shadow' }) {
   };
   const decisions = [];
   const seen = new Set(working.observations.map((item) => item.obsId));
+  const book = evolvePlaybook ? { entries: playbook.entries.map((entry) => ({ ...entry })) } : playbook;
+  const lifecycle = { hits: 0, decays: 0, quarantines: 0, recertifications: 0 };
   for (let index = 0; index < scenarios.length; index += 1) {
     const scenario = scenarios[index];
     if (!scenario || typeof scenario !== 'object' || !scenario.id) throw new ValidationError(`scenario ${index + 1} requires id`);
@@ -68,7 +104,7 @@ function replay({ jsonl, ledger, playbook, config, policy = 'shadow' }) {
     const request = validateRequest(scenario.request);
     const outcomes = {};
     for (const tier of ['T1', 'T2', 'T3']) outcomes[tier] = validateOutcome(scenario.outcomes?.[tier], `${scenario.id}.${tier}`, checkedConfig);
-    const decision = route({ request, ledger: working, playbook, config: checkedConfig, policy });
+    const decision = route({ request, ledger: working, playbook: book, config: checkedConfig, policy });
     const chosenTier = decision.effective.tier;
     const chosen = outcomes[chosenTier];
     const legacy = outcomes[decision.legacy.tier];
@@ -92,16 +128,30 @@ function replay({ jsonl, ledger, playbook, config, policy = 'shadow' }) {
       failures: chosen.failures, incidentLoss: chosen.incidentLoss, risk: request.risk, epoch: request.epoch
     });
     working.observations.sort((a, b) => a.obsId < b.obsId ? -1 : a.obsId > b.obsId ? 1 : 0);
-    decisions.push({ id: scenario.id, tier: chosenTier, predicted: chosenTier, executed: chosenTier, action: decision.effective.action, stateHash: decision.stateHash });
+    const record = { id: scenario.id, tier: chosenTier, predicted: chosenTier, executed: chosenTier, action: decision.effective.action, stateHash: decision.stateHash };
+    if (evolvePlaybook) {
+      const change = evolve(book.entries, request, decision, chosen);
+      if (change === 'hit') lifecycle.hits += 1;
+      if (change === 'decay') { lifecycle.hits += 1; lifecycle.decays += 1; }
+      if (change === 'quarantine') lifecycle.quarantines += 1;
+      if (change === 'recertified') lifecycle.recertifications += 1;
+      if (change) record.playbookChange = change;
+    }
+    decisions.push(record);
   }
-  return serialized({
+  const report = {
     schemaVersion: 1,
     policy,
     scenarios: scenarios.length,
     totals,
     decisions,
-    finalStateHash: canonicalHash({ ledger: working, playbook: playbook.entries, config: checkedConfig })
-  });
+    finalStateHash: canonicalHash({ ledger: working, playbook: book.entries, config: checkedConfig })
+  };
+  if (evolvePlaybook) {
+    report.lifecycle = lifecycle;
+    report.finalPlaybook = book.entries.map(({ id, class: taskClass, status, provenance, hits, floor }) => ({ id, class: taskClass, status, provenance, hits, floor: floor || null }));
+  }
+  return serialized(report);
 }
 
 module.exports = { IncompleteReplayError, parseJsonLines, replay };

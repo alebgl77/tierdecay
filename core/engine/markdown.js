@@ -151,8 +151,23 @@ function parseLedger(text) {
   return { priors, observations, legacy };
 }
 
+// Fenced code blocks (``` or ~~~) are documentation, never entries: the
+// shipped templates show the entry format inside one.
+function withoutFences(lines) {
+  let fence = null;
+  return lines.map((line) => {
+    const marker = /^\s*(```|~~~)/.exec(line);
+    if (marker) {
+      if (!fence) fence = marker[1];
+      else if (marker[1] === fence) fence = null;
+      return '';
+    }
+    return fence ? '' : line;
+  });
+}
+
 function parsePlaybook(text) {
-  const lines = linesOf(text);
+  const lines = withoutFences(linesOf(text));
   const entries = [];
   let section = null;
   let patternSections = 0;
@@ -190,11 +205,21 @@ function parsePlaybook(text) {
     const epochLine = uniqueLine('epoch');
     const bindingEpoch = epochLine ? /^epoch:\s*(\S+)\s*$/.exec(epochLine)?.[1] : null;
     if (epochLine && !bindingEpoch) throw new StateError(`${heading[1]} has an invalid epoch`);
+    const riskLine = uniqueLine('risk');
+    let risk;
+    if (riskLine) {
+      const match = /^risk:\s*([0-3])\s*$/.exec(riskLine);
+      if (!match) throw new StateError(`${heading[1]} has an invalid risk (expected 0-3)`);
+      risk = Number(match[1]);
+    }
     const entry = {
       id: heading[1], class: heading[2], status: section,
       provenance: provenance[1], provenanceDate: provenance[2], bindingEpoch,
       hits: uint(provenance[3], 'hits'), floor
     };
+    // Optional fields stay absent (not null) so canonical state hashes of
+    // playbooks that do not use them are unchanged.
+    if (risk !== undefined) entry.risk = risk;
     for (const field of ['WHEN:', 'DO:', 'VERIFY:']) {
       if (!block.some((line) => line.startsWith(field))) throw new StateError(`${entry.id} is missing ${field}`);
     }
@@ -245,4 +270,22 @@ function observationRow(observation) {
   return `| ${fields.join(' | ')} |`;
 }
 
-module.exports = { CLASS_RE, TIERS, StateError, isIsoDate, parseLedger, parsePlaybook, observationRow };
+// Raw body lines of each playbook entry (everything after its heading up to
+// the next heading), keyed by id. Used only by exports; routing never reads
+// free text. Call after parsePlaybook() has validated the document.
+function playbookBlocks(text) {
+  const lines = withoutFences(linesOf(text));
+  const blocks = new Map();
+  for (let index = 0; index < lines.length; index += 1) {
+    const heading = /^### (PB-[1-9][0-9]*) · /.exec(lines[index]);
+    if (!heading) continue;
+    const body = [];
+    for (index += 1; index < lines.length && !/^#{2,3} /.test(lines[index]); index += 1) body.push(lines[index]);
+    index -= 1;
+    while (body.length && !body[body.length - 1].trim()) body.pop();
+    blocks.set(heading[1], body);
+  }
+  return blocks;
+}
+
+module.exports = { CLASS_RE, TIERS, StateError, isIsoDate, parseLedger, parsePlaybook, playbookBlocks, observationRow };

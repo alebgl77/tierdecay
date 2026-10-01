@@ -55,6 +55,10 @@ function resolveClassState(request, playbook) {
   return state;
 }
 
+function recertifying(entry, request) {
+  return Boolean(entry.bindingEpoch && entry.bindingEpoch !== request.epoch);
+}
+
 function higherTier(a, b) { return TIER_NUMBER[a] >= TIER_NUMBER[b] ? a : b; }
 
 function baselineWithoutPlaybook(request, ledger) {
@@ -68,6 +72,11 @@ function legacyRoute(request, ledger, playbook, resolved = resolveClassState(req
   if (request.critical || request.risk === 3) return { tier: 'T3', action: 'safety', reason: 'critical-or-risk3' };
   if (resolved.quarantined) return { tier: 'T3', action: 'refusal', reason: 'quarantined-class' };
   const entry = resolved.selected;
+  if (entry && recertifying(entry, request)) {
+    // A binding change invalidates the evidence behind the entry's descent:
+    // run at its provenance tier, entry quoted, until it re-earns its hits.
+    return { tier: entry.provenance, action: 'recertify', reason: 'epoch-changed', playbook: entry.id };
+  }
   if (entry) {
     const provenance = TIER_NUMBER[entry.provenance];
     if (provenance === 1) return { tier: higherTier('T1', resolved.floor || 'T1'), action: 'exploit', reason: 'playbook-at-floor', playbook: entry.id };
@@ -143,6 +152,12 @@ function optimizedRoute(request, ledger, playbook, config, legacy, resolved) {
   const provenanceNumber = TIER_NUMBER[entry.provenance];
   const incumbent = entry.provenance;
   const promotion = safeIncumbent(incumbent, cell, request, config);
+  if (recertifying(entry, request)) {
+    if (promotion.safe === false || promotion.tier !== incumbent) {
+      return { tier: promotion.tier, action: 'promotion', reason: promotion.reason, playbook: entry.id, statistics: promotion.statistics };
+    }
+    return { ...legacy, statistics: promotion.statistics };
+  }
   if (promotion.safe === false || promotion.tier !== incumbent) {
     return { tier: promotion.tier, action: 'promotion', reason: promotion.reason, playbook: entry.id, statistics: promotion.statistics };
   }
@@ -224,4 +239,4 @@ function route({ request, ledger, playbook, config, policy = 'shadow' }) {
   });
 }
 
-module.exports = { TIER_NUMBER, validateRequest, rubricTier, legacyRoute, route };
+module.exports = { TIER_NUMBER, NUMBER_TIER, validateRequest, rubricTier, legacyRoute, resolveClassState, route };

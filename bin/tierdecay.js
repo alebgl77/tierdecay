@@ -7,22 +7,31 @@ const { stableStringify, serialized } = require('../core/engine/canonical');
 const { CLASS_RE, TIERS, isIsoDate, parseLedger, parsePlaybook, observationRow } = require('../core/engine/markdown');
 const { route } = require('../core/engine/route');
 const { replay } = require('../core/engine/replay');
+const { status } = require('../core/engine/status');
+const { exportPosterior } = require('../core/engine/export');
+const { bench } = require('../core/engine/bench');
 
 function usage() {
-  return `TierDecay deterministic router v0.3.0
+  return `TierDecay deterministic router v0.4.0
 
 Usage:
   tierdecay route --request FILE [--ledger FILE] [--playbook FILE] [--config FILE] [--policy legacy|shadow|optimize]
   tierdecay observe --observation FILE
   tierdecay replay --scenario FILE [--ledger FILE] [--playbook FILE] --config FILE [--policy shadow|optimize]
+  tierdecay status [--ledger FILE] [--playbook FILE] [--epoch EPOCH]
+  tierdecay export --format json|claude|cursor|skills [--out DIR] [--ledger FILE] [--playbook FILE] [--epoch EPOCH]
+  tierdecay bench --scenario FILE --config FILE [--ledger FILE] [--playbook FILE] [--permutations N] [--seed S]
 
-FILE may be - for stdin (once). Defaults use .tierdecay/{ledger.md,playbook.md,router-config.json}.
-Output is canonical JSON without timestamps; observe outputs one validated Markdown row.`;
+FILE may be - for stdin (once). Defaults use .tierdecay/{ledger.md,playbook.md,router-config.json},
+or the native .claude/routing-ledger.md and .claude/skills/repo-playbook/SKILL.md when only those exist.
+Output is canonical JSON without timestamps; observe outputs one validated Markdown row;
+export --format claude|cursor outputs a Markdown routing table; export --format skills writes
+Agent Skills for live playbook entries under --out and never touches the ledger or playbook.`;
 }
 
 function argumentsOf(argv) {
   const command = argv[0];
-  if (!['route', 'observe', 'replay'].includes(command)) throw Object.assign(new Error(usage()), { exitCode: 2 });
+  if (!['route', 'observe', 'replay', 'status', 'export', 'bench'].includes(command)) throw Object.assign(new Error(usage()), { exitCode: 2 });
   const options = {};
   for (let index = 1; index < argv.length; index += 2) {
     const key = argv[index];
@@ -63,10 +72,28 @@ function output(value) {
   process.stdout.write(`${stableStringify(serialized(value))}\n`);
 }
 
+// Non-native adapters keep state in .tierdecay/; the native Claude Code
+// adapter and plugin keep it in .claude/. Explicit options always win.
+function defaultStatePaths() {
+  const nativeLedger = path.join(process.cwd(), '.claude', 'routing-ledger.md');
+  if (!fs.existsSync(defaultFile('ledger.md')) && fs.existsSync(nativeLedger)) {
+    return { ledger: nativeLedger, playbook: path.join(process.cwd(), '.claude', 'skills', 'repo-playbook', 'SKILL.md') };
+  }
+  return { ledger: defaultFile('ledger.md'), playbook: defaultFile('playbook.md') };
+}
+
 function state(options) {
-  const ledger = parseLedger(read(options.ledger || defaultFile('ledger.md')));
-  const playbook = parsePlaybook(read(options.playbook || defaultFile('playbook.md')));
-  return { ledger, playbook };
+  const defaults = defaultStatePaths();
+  const ledger = parseLedger(read(options.ledger || defaults.ledger));
+  const playbookText = read(options.playbook || defaults.playbook);
+  const playbook = parsePlaybook(playbookText);
+  return { ledger, playbook, playbookText };
+}
+
+function integer(value, label) {
+  if (value === undefined) return undefined;
+  if (!/^(0|[1-9][0-9]*)$/.test(value)) throw Object.assign(new Error(`${label} must be a non-negative integer`), { exitCode: 2 });
+  return Number(value);
 }
 
 function validateObservation(value) {
@@ -124,12 +151,32 @@ function main(argv) {
     process.stdout.write(`${validateObservation(json(options.observation))}\n`);
     return;
   }
-  const allowed = new Set(command === 'route'
-    ? ['request', 'ledger', 'playbook', 'config', 'policy']
-    : ['scenario', 'ledger', 'playbook', 'config', 'policy']);
+  const allowedByCommand = {
+    route: ['request', 'ledger', 'playbook', 'config', 'policy'],
+    replay: ['scenario', 'ledger', 'playbook', 'config', 'policy'],
+    status: ['ledger', 'playbook', 'epoch'],
+    export: ['format', 'out', 'ledger', 'playbook', 'epoch'],
+    bench: ['scenario', 'ledger', 'playbook', 'config', 'permutations', 'seed']
+  };
+  const allowed = new Set(allowedByCommand[command]);
   for (const key of Object.keys(options)) if (!allowed.has(key)) throw Object.assign(new Error(`unknown option: --${key}`), { exitCode: 2 });
-  const { ledger, playbook } = state(options);
-  if (command === 'route') {
+  const { ledger, playbook, playbookText } = state(options);
+  if (command === 'status') {
+    output(status({ ledger, playbook, epoch: options.epoch }));
+  } else if (command === 'export') {
+    if (!options.format) throw Object.assign(new Error('export requires --format'), { exitCode: 2 });
+    if (options.out && options.format !== 'skills') throw Object.assign(new Error('--out is only valid with --format skills'), { exitCode: 2 });
+    const result = exportPosterior({ ledger, playbook, playbookText, epoch: options.epoch, format: options.format, out: options.out });
+    if (result.kind === 'json') output(result.value);
+    else process.stdout.write(result.value);
+  } else if (command === 'bench') {
+    const config = json(options.config || defaultFile('router-config.json'));
+    output(bench({
+      jsonl: read(options.scenario), ledger, playbook, config,
+      permutations: integer(options.permutations, 'permutations') ?? 20,
+      seed: integer(options.seed, 'seed') ?? 1
+    }));
+  } else if (command === 'route') {
     const policy = options.policy || 'shadow';
     const config = policy === 'legacy' ? null : json(options.config || defaultFile('router-config.json'));
     output(route({ request: json(options.request), ledger, playbook, config, policy }));

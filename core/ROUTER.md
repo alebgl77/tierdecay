@@ -1,4 +1,4 @@
-# TierDecay deterministic router (v0.3)
+# TierDecay deterministic router (v0.4)
 
 The router is an optional, local advisor over TierDecay's Markdown state. It
 uses Node.js built-ins only, never edits the ledger or playbook, never calls a
@@ -14,6 +14,9 @@ risk-3 work always routes to T3. T0 is read-only and can never be returned.
 
 A lower-tier candidate exists only when the request names a live, exact-class
 playbook entry. A probe can move at most one tier below that entry's provenance.
+An entry whose `epoch:` differs from the request epoch never yields a lower
+candidate: the decision is `recertify` at its provenance tier (and under
+`optimize`, a promotion when the new epoch has no safe evidence).
 Quarantine and sticky floors are resolved across the entire exact class and
 cannot be bypassed by omitting or changing an ID. Ambiguous live/quarantined
 state, contradictory floors, duplicate observations, partial measurement rows,
@@ -35,7 +38,17 @@ node bin/tierdecay.js replay \
   --scenario scenarios.jsonl --ledger .tierdecay/ledger.md \
   --playbook .tierdecay/playbook.md \
   --config calibrated-router-config.json --policy shadow
+
+node bin/tierdecay.js status --epoch my-bindings-2026-10
+node bin/tierdecay.js export --format claude      # or cursor | json
+node bin/tierdecay.js export --format skills --out .claude/skills
+node bin/tierdecay.js bench --scenario scenarios.jsonl \
+  --config calibrated-router-config.json --permutations 50 --seed 7
 ```
+
+Without `--ledger`/`--playbook`, commands read `.tierdecay/`; when only the
+native `.claude/routing-ledger.md` exists they read it and
+`.claude/skills/repo-playbook/SKILL.md` instead.
 
 Run the CLI from the checksum-verified TierDecay distribution; the installer
 adds only `.tierdecay/ROUTER.md` and the disabled local configuration. `route`
@@ -45,8 +58,36 @@ row to stdout; the orchestrator decides whether to append it. `-` means stdin
 and may be used only once per invocation.
 
 Exit codes: `0` valid decision or documented shadow fallback; `2` invalid
-request/config; `3` ambiguous or incoherent Markdown state; `4` replay missing
-potential outcomes; `5` unexpected internal failure.
+request/config/arguments; `3` ambiguous or incoherent Markdown state; `4`
+replay missing potential outcomes; `5` unexpected internal failure.
+
+## Status, export, and bench
+
+`status` prints, per known class, the default route a request without special
+risk would get (quarantine, recertify, probe, exploit, prior, or rubric), the
+entry's hits against its risk-gated requirement (`requiredHits` 3 / 4 / 5 for
+risk 0 / 1 / 2, null for risk 3; entries without `risk:` count as 2), and the
+bookkeeping the orchestrator owes next. It is read-only.
+
+`export` hands that posterior to the tool that actually picks the model.
+`claude` and `cursor` print Markdown routing tables (Claude Code agent, alias,
+and effort; Cursor model or Auto goal); `json` prints the same data with every
+binding. `skills --out DIR` writes one Agent Skills directory
+(`tierdecay-pb-<n>-<class>/SKILL.md`) per live entry and deletes only the
+directories it generated earlier whose entry is no longer live; quarantined
+entries are never exported. Exports never touch the ledger or playbook.
+
+`bench` runs `replay` under `--permutations` orders (the first is file order,
+the rest are seeded Fisher–Yates shuffles) for the protocol (`shadow`
+effective decisions) and `optimize`, with in-memory playbook evolution: a
+failure while an entry is referenced quarantines it and records the failed
+tier as its floor, a pass adds a hit, enough hits rewrite provenance, and a
+passing recertification adopts the epoch. It reports mean, standard
+deviation, min, and max of every cumulative metric, the saving against an
+always-T3 policy, `orderSpread = (max - min) / mean` of the fully loaded loss,
+and order-free baselines (always T1/T2/T3 and the per-scenario oracle). The
+same evolution is available to `replay` programmatically
+(`evolvePlaybook: true`); the CLI `replay` keeps the v0.3 output.
 
 ## Request and observation
 
@@ -136,4 +177,6 @@ non-empty outcome labels remain allowed. Legacy routing does not load a router
 configuration.
 
 `benchmarks/synthetic-v1.jsonl` is deterministic synthetic data for regression
-testing only. TierDecay has no published benchmark on real workloads.
+testing only. `benchmarks/pilot-v1/` is a small real-model pilot on a controlled
+fixture repository (36 graded runs); see its `RESULTS.md` for scope and
+limits. It is not a production-workload benchmark.
