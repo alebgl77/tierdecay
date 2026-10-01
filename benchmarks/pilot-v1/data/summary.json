@@ -1,0 +1,145 @@
+{
+  "generated": "pilot-v1",
+  "runs": 36,
+  "distillRuns": 3,
+  "arms": {
+    "t3cold": {
+      "runs": 9,
+      "accepted": 9,
+      "usdRawMean": 0.3014,
+      "usdWarmMean": 0.1795,
+      "usdWarmSd": 0.0097,
+      "usdInputMean": 0.2787,
+      "usdOutputMean": 0.0227,
+      "callsMean": 6.78,
+      "toolUsesMean": 7.67,
+      "secondsMean": 34.3,
+      "cacheReadMean": 350669,
+      "outputEstimatedMean": 1133
+    },
+    "t1cold": {
+      "runs": 15,
+      "accepted": 15,
+      "usdRawMean": 0.1643,
+      "usdWarmMean": 0.1167,
+      "usdWarmSd": 0.012,
+      "usdInputMean": 0.1536,
+      "usdOutputMean": 0.0107,
+      "callsMean": 6,
+      "toolUsesMean": 6.4,
+      "secondsMean": 22.9,
+      "cacheReadMean": 309184,
+      "outputEstimatedMean": 1069
+    },
+    "t1pb": {
+      "runs": 12,
+      "accepted": 12,
+      "usdRawMean": 0.1428,
+      "usdWarmMean": 0.1113,
+      "usdWarmSd": 0.0125,
+      "usdInputMean": 0.1313,
+      "usdOutputMean": 0.0115,
+      "callsMean": 5.5,
+      "toolUsesMean": 5.92,
+      "secondsMean": 27.6,
+      "cacheReadMean": 287411,
+      "outputEstimatedMean": 1153
+    }
+  },
+  "contrasts": {
+    "sonnetColdVsOpusCold_allTasks": {
+      "armA": "t1cold",
+      "armB": "t3cold",
+      "tasks": 9,
+      "meanA": 0.1179,
+      "meanB": 0.1795,
+      "meanDiff": -0.0615,
+      "ci95": [
+        -0.0676,
+        -0.0544
+      ],
+      "ratio": 0.657,
+      "ratioCi95": [
+        0.626,
+        0.694
+      ],
+      "tasksWhereALower": 9
+    },
+    "sonnetPlaybookVsOpusCold_reuseTasks": {
+      "armA": "t1pb",
+      "armB": "t3cold",
+      "tasks": 6,
+      "meanA": 0.1113,
+      "meanB": 0.1758,
+      "meanDiff": -0.0645,
+      "ci95": [
+        -0.0763,
+        -0.0539
+      ],
+      "ratio": 0.633,
+      "ratioCi95": [
+        0.581,
+        0.685
+      ],
+      "tasksWhereALower": 6
+    },
+    "sonnetPlaybookVsSonnetCold_reuseTasks": {
+      "armA": "t1pb",
+      "armB": "t1cold",
+      "tasks": 6,
+      "meanA": 0.1113,
+      "meanB": 0.1148,
+      "meanDiff": -0.0034,
+      "ci95": [
+        -0.0119,
+        0.0054
+      ],
+      "ratio": 0.97,
+      "ratioCi95": [
+        0.897,
+        1.049
+      ],
+      "tasksWhereALower": 4
+    },
+    "sonnetPlaybookVsSonnetCold_calls": {
+      "armA": "t1pb",
+      "armB": "t1cold",
+      "tasks": 6,
+      "meanA": 5.5,
+      "meanB": 5.8333,
+      "meanDiff": -0.3333,
+      "ci95": [
+        -0.9167,
+        0.3333
+      ],
+      "ratio": 0.943,
+      "ratioCi95": [
+        0.853,
+        1.063
+      ],
+      "tasksWhereALower": 4
+    }
+  },
+  "economics": {
+    "unit": "USD per task, warm-cache",
+    "C_distill": 0.0789,
+    "vsStaticFrontier": {
+      "C_hi": 0.1758,
+      "C_lo": 0.1113,
+      "delta": 0.0645,
+      "breakEvenReuses": {
+        "weak": 2,
+        "strict": 2
+      }
+    },
+    "vsStaticCheapTier": {
+      "C_hi": 0.1148,
+      "C_lo": 0.1113,
+      "delta": 0.0035,
+      "breakEvenReuses": {
+        "weak": 23,
+        "strict": 23
+      }
+    }
+  }
+}

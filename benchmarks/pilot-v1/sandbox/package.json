@@ -1,0 +1,11 @@
+{
+  "name": "kvlite",
+  "version": "1.4.0",
+  "private": true,
+  "description": "Tiny JSON-file key/value store with a CLI, schema migrations, and value validation rules",
+  "license": "MIT",
+  "type": "commonjs",
+  "bin": { "kvlite": "src/cli.js" },
+  "scripts": { "test": "node --test test/*.test.js" },
+  "engines": { "node": ">=18" }
+}
