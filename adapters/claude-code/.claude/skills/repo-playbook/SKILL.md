@@ -18,6 +18,8 @@ Never apply anything under QUARANTINE.
 ```
 ### PB-<n> · <class-signature>
 provenance: T<x> <YYYY-MM> · hits: <k>
+risk: <0-3>
+epoch: <binding-epoch>
 WHEN: <conditions matching a task to this class>
 DO:   <3–10 imperative steps / invariants, order matters>
 VERIFY: <the check that proves it worked>

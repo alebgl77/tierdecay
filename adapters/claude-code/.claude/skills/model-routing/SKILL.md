@@ -8,6 +8,8 @@ description: Complexity-based routing of tasks across four model tiers — front
 ## 0. Ledger pre-check — posterior beats prior
 
 Before scoring anything, read `.claude/routing-ledger.md`, in this order:
+- Class has a live **repo-playbook** entry recorded under another binding
+  epoch → RECERTIFY at the entry's provenance tier (`tier-decay` §3).
 - Class has a live **repo-playbook** entry (not quarantined, floor not
   reached) → dispatch one tier below the entry's provenance as a PROBE, entry
   quoted in the brief (`tier-decay` §3). **A live entry outranks PRIORS** — this
@@ -71,8 +73,8 @@ A brief you can't write precisely is a task you haven't finished planning.
 - De-escalation: a [T2] task that decomposes into mechanical parts → split
   and fan out to [T1] in parallel.
 - Every outcome — success, escalation, probe pass/fail — becomes a ledger row
-  (`tier-decay` §1). Two escalations raise a class's default; two probe hits
-  lower it. The router learns this repo.
+  (`tier-decay` §1). Two escalations raise a class's default; enough probe
+  hits for the class's risk (3 / 4 / 5) lower it. The router learns this repo.
 
 ## 5. Parallelism
 

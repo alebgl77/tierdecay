@@ -19,6 +19,9 @@ for (const rule of ['Edit(.claude/**)', 'Edit(.tierdecay/**)']) {
 }
 
 const aliases = { oracle: 'opus', 'heavy-executor': 'opus', executor: 'sonnet', scout: 'sonnet' };
+// A tier binding is (alias, effort). Effort separates roles that share an
+// alias: T3 oracle > T2 heavy executor on opus; T1 executor > T0 scout on sonnet.
+const efforts = { oracle: 'xhigh', 'heavy-executor': 'high', executor: 'medium', scout: 'low' };
 const guardHook = [
   'hooks:',
   '  PreToolUse:',
@@ -34,7 +37,7 @@ for (const [name, alias] of Object.entries(aliases)) {
   const match = source.match(/^---\n([\s\S]*?)\n---(?:\n|$)/);
   assert.ok(match, `${name}: missing frontmatter delimiters`);
   const frontmatter = match[1];
-  for (const [field, expected] of [['name', name], ['model', alias]]) {
+  for (const [field, expected] of [['name', name], ['model', alias], ['effort', efforts[name]]]) {
     const values = [...frontmatter.matchAll(new RegExp(`^${field}: (.+)$`, 'gm'))];
     assert.equal(values.length, 1, `${name}: expected one ${field} field`);
     assert.equal(values[0][1], expected, `${name}: incorrect ${field}`);
@@ -46,9 +49,34 @@ for (const [name, alias] of Object.entries(aliases)) {
   } else {
     assert.match(frontmatter, /^tools: Read, Grep, Glob$/m, `${name}: tools must stay read-only`);
   }
-  console.log(`${name}: ${alias}, frontmatter and guard/read-only structure OK`);
+  console.log(`${name}: ${alias} @ ${efforts[name]}, frontmatter and guard/read-only structure OK`);
 }
 
 assert.ok(fs.statSync(path.join(nativeRoot, 'hooks', 'tierdecay-guard.sh')).isFile(),
   'registered guard hook must exist');
+
+// Policy: no tier is ever bound to a Haiku-class model. The cheap end of the
+// ladder is the `sonnet` alias at lower effort. MODELS.md (core and its plugin
+// copy) states the policy and CHANGELOG.md is history; every other shipped
+// binding surface is checked here.
+function walk(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    return entry.isDirectory() ? walk(full) : [full];
+  });
+}
+const bindingSurfaces = [
+  ...walk(path.join(repoRoot, 'adapters')),
+  ...walk(path.join(repoRoot, 'plugins')),
+  ...walk(path.join(repoRoot, 'core')),
+  path.join(repoRoot, 'bin', 'tierdecay.js'),
+  path.join(repoRoot, 'install.sh'),
+  path.join(repoRoot, '.claude-plugin', 'marketplace.json')
+].filter((file) => fs.existsSync(file) && path.basename(file) !== 'MODELS.md'
+  && (/\.(md|mdc|json|js|sh)$/.test(file) || path.basename(path.dirname(file)) === 'bin'));
+for (const file of bindingSurfaces) {
+  assert.ok(!/haiku/i.test(fs.readFileSync(file, 'utf8')), `${path.relative(repoRoot, file)} must not bind or mention a Haiku-class model`);
+}
+console.log(`No Haiku binding across ${bindingSurfaces.length} shipped files.`);
 console.log('Native model policy and hook registration are structurally conformant (not live integration).');

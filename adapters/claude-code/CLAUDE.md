@@ -8,15 +8,15 @@ file exploration — subagents exist for that.
 
 Tiers are roles. Each agent binds its tier with a Claude Code **alias**, which
 resolves to the latest model in that family — so a new release needs no edit
-here. Four roles use only `opus` and `sonnet`; binding policy and pinning
-guidance: `.tierdecay/MODELS.md`.
+here. Four roles use only `opus` and `sonnet`, separated by effort; binding
+policy and pinning guidance: `.tierdecay/MODELS.md`.
 
-| Tier | Alias    | Agent                   | Job |
-|------|----------|-------------------------|-----|
-| T3   | `opus`   | main thread + `oracle`  | Planning, architecture, novel algorithms, root-causing resistant bugs, review of critical diffs |
-| T2   | `opus`   | `heavy-executor`        | Complex execution: multi-file refactors, concurrency, migrations, perf, subtle correctness |
-| T1   | `sonnet` | `executor`              | Standard execution: specced features, tests, docs, mechanical edits |
-| T0   | `sonnet` | `scout`                 | Read-only recon: map files, symbols, conventions, risks |
+| Tier | Alias · effort    | Agent                   | Job |
+|------|-------------------|-------------------------|-----|
+| T3   | `opus` · `xhigh`  | main thread + `oracle`  | Planning, architecture, novel algorithms, root-causing resistant bugs, review of critical diffs |
+| T2   | `opus` · `high`   | `heavy-executor`        | Complex execution: multi-file refactors, concurrency, migrations, perf, subtle correctness |
+| T1   | `sonnet` · `medium` | `executor`            | Standard execution: specced features, tests, docs, mechanical edits |
+| T0   | `sonnet` · `low`  | `scout`                 | Read-only recon: map files, symbols, conventions, risks |
 
 ## Protocol — every non-trivial request
 
@@ -42,8 +42,9 @@ guidance: `.tierdecay/MODELS.md`.
 6. **DISTILL** — close every task with one ledger row (any tier). After a
    `[T2]`/`[T3]` success on a plausibly recurring class: compile the pattern
    into the `repo-playbook` skill (≤15 lines) per the `tier-decay` protocol.
-   The next occurrence of that class probes one tier lower; two probe hits
-   lower the class's default tier permanently.
+   The next occurrence of that class probes one tier lower; 3 / 4 / 5 probe
+   hits (risk 0 / 1 / 2) lower the class's default tier. After a model or
+   effort change, entries from the old epoch re-certify at provenance first.
 
 ## Hard rules
 

@@ -9,20 +9,36 @@ CI enforces this: a versioned model string (`Opus 4.8`, `claude-sonnet-4-6`, …
 appearing anywhere outside this file, the changelog, or a historical ledger
 fails the `conformance` job.
 
-## Default bindings — four roles, two aliases (updated 2026-09-03)
+## Default bindings — four roles, two aliases, four effort levels (updated 2026-10-01)
 
-The native adapter uses only `opus` and `sonnet`. T3 and T2 share `opus`; T1
-and T0 share `sonnet`. The roles stay distinct even where the model is the
-same: planning/review, complex execution, standard execution, and read-only
-recon. Check access and the resolved model in your client when starting a
-session; this policy does not promise availability on any particular plan.
+A tier binding is **(alias, effort)**. The native adapter uses only `opus` and
+`sonnet`; effort separates the roles that share an alias. T3 and T2 share
+`opus` (`xhigh` vs `high`); T1 and T0 share `sonnet` (`medium` vs `low`). The
+roles stay distinct: planning/review, complex execution, standard execution,
+and read-only recon. Check access and the resolved model in your client when
+starting a session; this policy does not promise availability on any plan.
 
-| Tier | Role | Claude Code alias |
-|---|---|---|
-| T3 | main thread / oracle: plan, architect, review critical diffs | `opus` |
-| T2 | heavy executor: refactors, concurrency, perf | `opus` |
-| T1 | executor: specced features, tests, docs | `sonnet` |
-| T0 | scout: read-only recon | `sonnet` |
+| Tier | Role | Claude Code alias | Effort |
+|---|---|---|---|
+| T3 | main thread / oracle: plan, architect, review critical diffs | `opus` | `xhigh` (oracle) |
+| T2 | heavy executor: refactors, concurrency, perf | `opus` | `high` |
+| T1 | executor: specced features, tests, docs | `sonnet` | `medium` |
+| T0 | scout: read-only recon | `sonnet` | `low` |
+
+The main thread's effort is whatever your client is set to; the subagents pin
+theirs in `effort:` frontmatter. Effort levels are a cost lever inside one
+model: lowering effort cuts thinking and tool-call volume without changing the
+model. They are defaults, not measurements — tune them per class from your
+ledger, and treat an effort change like a model change (new binding epoch).
+
+### No Haiku-class binding (policy)
+
+TierDecay deliberately never binds a tier to a Haiku-class model. The cheap end
+of the ladder is the fast workhorse (`sonnet`) at lower effort. Two reasons:
+quality headroom on the executor tiers matters more than the last price step,
+and one model family per role keeps prompt-cache reuse and the posterior
+interpretable. `tests/test-model-policy.js` fails if any shipped adapter,
+plugin, core file other than this one, or the installer names that family.
 
 ## Prefer aliases over pinned IDs
 
@@ -43,10 +59,12 @@ the pin in your ledger so the row stays interpretable later.
    release announcement or an alias name alone.
 2. Keep the two-alias policy unless you deliberately revise it. Skills, agents,
    and adapter prose name roles, not versions, so they need no version edit.
-3. Re-run your probes. A model change invalidates the empirical posterior: a
-   class that decayed to T1 under the old fast model may or may not hold under
-   the new one. Treat a tier rebinding like a playbook revision — the next
-   occurrence of each decayed class is a fresh probe, not a settled default.
+3. Start a new binding epoch. A model or effort change invalidates the
+   empirical posterior: a class that decayed to T1 under the old binding may or
+   may not hold under the new one. Entries that record `epoch:` are
+   re-certified automatically — the router runs them at their provenance tier
+   (action `recertify`) until a pass adopts the new epoch — and measured rows
+   never cross epochs. `tierdecay status --epoch <new>` lists what is due.
 
 ## Other providers
 
@@ -55,7 +73,7 @@ The tier roles are provider-agnostic. Map them to whatever your CLI exposes:
 | Tier | Gemini | Aider | Generic |
 |---|---|---|---|
 | T3 / T2 | Pro-class | `--model` (architect) | your frontier / strong model |
-| T1 / T0 | Flash-class | `--editor-model` | your fast / cheapest model |
+| T1 / T0 | Flash-class | `--editor-model` | your fast workhorse (lower effort for T0) |
 
 If your provider has no alias mechanism, this file is where you record the
 pinned IDs — and the date you last checked them.

@@ -18,6 +18,12 @@
 #
 # Hook contract (code.claude.com/docs/en/hooks): the tool-call JSON arrives
 # on stdin; exit 2 blocks the call and returns stderr to the agent.
+#
+# Scope: in the native adapter this script is attached to the executor agents'
+# own frontmatter, so it always enforces. Plugin hooks apply session-wide
+# (plugin agents ignore `hooks:` frontmatter), so the plugin passes
+# `--executors-only`: the guard then enforces only when the payload's
+# `agent_type` names a TierDecay executor and lets the main thread through.
 set -euo pipefail
 
 deny_no_node() {
@@ -154,6 +160,11 @@ try {
 
 if (!payload || typeof payload !== "object" || Array.isArray(payload)) deny();
 
+if (process.argv.slice(1).includes("--executors-only")) {
+  const agentType = typeof payload.agent_type === "string" ? payload.agent_type : "";
+  if (!/^(?:[A-Za-z0-9_-]+:)?(?:executor|heavy-executor)$/.test(agentType)) process.exit(0);
+}
+
 const tool = payload.tool_name;
 const toolInput = payload.tool_input && typeof payload.tool_input === "object"
   ? payload.tool_input
@@ -177,4 +188,4 @@ if (tool === "Bash") {
   const stateReference = /(^|[^A-Za-z0-9_.-])\.(?:claude|tierdecay)[ .]*(?=$|[\\/]|[^A-Za-z0-9_.-])/i;
   if (stateReference.test(command)) deny();
 }
-'
+' -- ${1+"$@"}

@@ -29,7 +29,10 @@ its empirical default tier now OVERRIDES the scoring rubric.
 
 Distill iff the class will plausibly recur (expected ≥2 future occurrences).
 Write a **≤15-line** entry into the `repo-playbook` skill, following its
-format. Distill the DECISIONS — invariants, order of operations, the trap and
+format, including `risk:` (the class's rubric risk) and `epoch:` (the current
+binding epoch). An entry earns its distillation cost only where the lower tier
+fails or struggles without it; if a cold lower-tier attempt already passes,
+routing alone captures the saving. Distill the DECISIONS — invariants, order of operations, the trap and
 its avoidance — never diffs, never secrets, never volatile business values.
 A wrong pattern costs more than no pattern: when in doubt, don't distill.
 
@@ -39,11 +42,20 @@ On the NEXT occurrence of a distilled class, dispatch **one tier below the
 entry's provenance tier**, with the entry quoted verbatim in the brief's
 CONTEXT and acceptance criteria mandatory.
 
-- **Pass** → `hits +1` on the entry. At `hits ≥ 2`, the class's default tier
-  is permanently lowered in PRIORS **and the entry's `provenance:` is rewritten
-  to the new lower tier**. Decay is iterative: the counter resets and — because
-  a live entry outranks PRIORS (`model-routing` §0) — the class probes the next
-  tier down on later occurrences (T3→T2→T1), until provenance reaches T1.
+- **Pass** → `hits +1` on the entry. Downgrade is confidence-gated by the
+  entry's `risk:` — **3 / 4 / 5 hits for risk 0 / 1 / 2**; risk-3 classes
+  never decay; no `risk:` line counts as risk 2. (Quarantine-on-failure means
+  the evidence is always k/k passes; k is the smallest count whose 80%
+  Clopper–Pearson lower bound `0.2^(1/k)` reaches 0.5 / 0.6 / 0.7.) At the
+  threshold the class's default tier is lowered in PRIORS **and the entry's
+  `provenance:` is rewritten to the new lower tier**. Decay is iterative: the
+  counter resets and — because a live entry outranks PRIORS (`model-routing`
+  §0) — the class probes the next tier down on later occurrences (T3→T2→T1),
+  until provenance reaches T1.
+- **Recertify** → an entry whose `epoch:` differs from the current binding
+  epoch (a model or effort changed, `.tierdecay/MODELS.md`) runs at its
+  provenance tier, entry quoted. Pass → set `epoch:` to the current epoch,
+  `hits: 0`. Fail → quarantine as below.
 - **Fail** → escalate normally, move the entry to QUARANTINE with a one-line
   failure cause. The failed tier becomes the class's **floor** (sticky tier);
   revise or delete the entry on next encounter.
@@ -67,11 +79,15 @@ RAISED one tier in PRIORS. Calibration runs both directions.
 
 ## 6. Economics
 
-Break-even is conditional, not guaranteed. With fully loaded costs in the same
+Run `tierdecay status` after DISTILL: it lists decays due, recertifications,
+and classes missing a PRIORS row. Break-even is conditional, not guaranteed. With fully loaded costs in the same
 units, first-reuse break-even requires the one-time cost to satisfy
 `C_distill ≤ C_hi - C_lo`, where `C_lo` is the expected cost of a reuse attempt
 beginning at the low tier, including routing, verification, failed probes, and
 escalations. If `C_hi ≤ C_lo`, a nonnegative distillation cost cannot be
-amortized into savings. TierDecay has no published benchmark. Health check: for
+amortized into savings. Measured once on a controlled fixture
+(`benchmarks/pilot-v1`): the lower tier cut per-task cost by about a third at
+equal acceptance, while the playbook entry itself added no significant saving
+over a cold lower-tier attempt. Health check: for
 recurring classes whose probes pass, the `executed` column in the LOG should
 drift toward T1 over time — that drift is the intended optimization.

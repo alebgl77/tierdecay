@@ -3,6 +3,7 @@ name: heavy-executor
 description: Complex implementation agent for tasks tagged [T2] — multi-file refactors, concurrency/async, schema and data migrations, performance optimization, intricate state machines, bugs with unclear repro, subtle correctness work. MUST BE USED for [T2] tasks.
 tools: Read, Write, Edit, Grep, Glob, Bash
 model: opus
+effort: high
 skills:
   - execution-standards
   - repo-playbook
