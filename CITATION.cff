@@ -12,6 +12,8 @@ abstract: >-
 authors:
   - family-names: "Beguel"
     given-names: "Alexandre"
+    alias: "alebgl77"
+    website: "https://beguel.com/"
 version: 0.5.0
 date-released: "2026-10-01"
 license: MIT

@@ -506,6 +506,10 @@ calibration, stable 1.0 contracts: [`ROADMAP.md`](ROADMAP.md).
 Adapters wanted: Qwen Code, Amp, Continue, Kiro. One folder, one
 context file, one README — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Author
+
+Built and maintained by **[Alexandre Beguel](https://github.com/alebgl77)**, Agentic AI Architect and external CAIO based in Paris. He works on production GenAI, LLMOps, LLM FinOps and evidence-first AI governance. [beguel.com](https://beguel.com/) · [LinkedIn](https://www.linkedin.com/in/beguel/) · [Profile in English, French and Spanish](https://alebgl77.github.io/)
+
 ---
 
 <div align="center">
