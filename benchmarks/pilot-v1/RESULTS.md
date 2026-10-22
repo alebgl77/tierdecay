@@ -51,6 +51,12 @@ cost?
 the hidden tests. The classes sit below the fast tier's ceiling, so this pilot
 cannot show the playbook rescuing a failing tier.
 
+**Reading the headline numbers:** the 0.657 ratio compares the cold fast tier
+with the cold frontier on paired tasks. The 24.0% figure later in this report
+comes from a protocol replay over the recorded outcomes, including distillation.
+They have different numerators and are not two measurements of a deployed
+TierDecay system's savings.
+
 | Arm | Runs | Accepted | Warm USD / task (mean ± sd) | Raw USD / task | API calls | Tool uses | Wall s |
 |---|---|---|---|---|---|---|---|
 | `t3cold` | 9 | 9 | 0.1795 ± 0.0097 | 0.3014 | 6.78 | 7.67 | 34.3 |
