@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning][semver].
 
 ## [Unreleased]
 
+### Changed
+
+- Clarify pilot-v1 comparisons in the README and results: the cold fast-tier
+  cost ratio and the protocol replay saving use different numerators. Keep the
+  small-fixture scope, absence of a significant distillation benefit and lack
+  of a production-workload savings claim explicit. No new model runs.
+
 ### Fixed
 
 - Tag backfills (`tag-release.yml` dispatch on an earlier commit) verify the
