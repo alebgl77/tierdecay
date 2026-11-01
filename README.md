@@ -195,8 +195,10 @@ when `C_distill = 0`. If `Δ = 0`, equality holds for every `n` when
 ### Measured: pilot v1
 
 [`benchmarks/pilot-v1`](benchmarks/pilot-v1/RESULTS.md) ran 36 real executor
-tasks (Opus and Sonnet) on a controlled fixture with hidden acceptance tests:
-three recurring classes, three instances each.
+runs (Opus and Sonnet) on a controlled fixture with hidden acceptance tests:
+three recurring classes, three instances each, plus three distillation runs.
+This is a small controlled pilot; the protocol result below is a replay of its
+recorded outcomes, not an observed production-workload saving.
 
 | Route | Accepted | Cost per task (warm cache) |
 |---|---|---|
@@ -204,11 +206,17 @@ three recurring classes, three instances each.
 | always fast tier (`sonnet`) | 15 / 15 | 0.117 USD |
 | TierDecay probe (`sonnet` + distilled entry) | 12 / 12 | 0.111 USD |
 
-The fast tier cost **0.66×** the frontier per task (95% interval 0.63–0.69) at
-equal acceptance. Replaying the protocol on those outcomes — first instance
-routed by the rubric, later ones probed — saves **24%** against
-always-frontier. The distilled entry itself added no significant saving over
-a cold fast-tier attempt (0.97×, interval 0.90–1.05); 11 of 12 probes flagged
+Two comparisons answer different questions:
+
+- **Fast tier without a playbook vs frontier:** **0.66×** warm-cache cost per
+  task (task-paired 95% interval 0.63–0.69; nine tasks), with all attempts accepted.
+- **Protocol replay vs always-frontier:** **24%** lower modeled cost on those
+  recorded outcomes, including distillation. The rubric selects the first
+  instance's tier and later instances are probed. This does not establish an
+  advantage over always-fast or a native router.
+
+The distilled entry itself added no significant saving over a cold fast-tier
+attempt (0.97×, interval 0.90–1.05); 11 of 12 probes flagged
 a step of it as inaccurate or inapplicable. Read: on classes the cheap tier can
 already do, the value is the *routing*; the playbook matters where the cheap
 tier fails without it — a regime this pilot did not reach. One fixture, small
