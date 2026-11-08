@@ -99,6 +99,25 @@ test('skills export refuses unowned collisions before writing any skill', () => 
   assert.throws(() => exportPosterior({ ledger, playbook: parsePlaybook(text), playbookText: text, format: 'skills', out }), /unowned/);
   assert.equal(fs.readFileSync(path.join(collision, 'SKILL.md'), 'utf8'), 'manual work');
   assert.equal(fs.existsSync(path.join(out, 'tierdecay-pb-1-fix-first-cli')), false);
+  // A dangling directory link must be rejected during preflight as well.
+  // existsSync follows its absent target and would incorrectly skip it.
+  fs.unlinkSync(path.join(collision, 'SKILL.md'));
+  fs.rmdirSync(collision);
+  const target = path.join(out, 'missing-target');
+  fs.mkdirSync(target);
+  try {
+    fs.symlinkSync(target, collision, 'junction');
+  } catch (error) {
+    fs.rmdirSync(target);
+    if (process.platform === 'win32' && error.code === 'EPERM' && !process.env.CI) {
+      console.log('# SKIP dangling-link subcase: local host denies junction creation; required in CI');
+      return;
+    }
+    throw error;
+  }
+  fs.rmdirSync(target);
+  assert.throws(() => exportPosterior({ ledger, playbook: parsePlaybook(text), playbookText: text, format: 'skills', out }), /unowned/);
+  assert.equal(fs.existsSync(path.join(out, 'tierdecay-pb-1-fix-first-cli')), false);
 });
 
 test('quarantine removes generated skill instructions but preserves added files', () => {

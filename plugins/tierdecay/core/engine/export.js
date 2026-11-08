@@ -182,8 +182,8 @@ function exportSkills(playbook, playbookText, out) {
   // skill or a symlink is not permission to replace somebody else's content.
   for (const name of wanted.keys()) {
     const dir = path.join(root, name);
-    if (!fs.existsSync(dir)) continue;
-    const stat = fs.lstatSync(dir);
+    const stat = fs.lstatSync(dir, { throwIfNoEntry: false });
+    if (!stat) continue;
     if (!stat.isDirectory() || stat.isSymbolicLink() || !ownedSkill(path.join(dir, 'SKILL.md'))) {
       throw Object.assign(new Error(`refusing to overwrite unowned skill: ${name}`), { exitCode: 3 });
     }
