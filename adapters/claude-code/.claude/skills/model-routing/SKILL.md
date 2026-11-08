@@ -1,13 +1,15 @@
 ---
 name: model-routing
-description: Complexity-based routing of tasks across four model tiers — frontier (T3), strong workhorse (T2), fast executor (T1), cheapest recon (T0). Use when planning any multi-step work, when deciding which subagent should execute a task, when writing a dispatch brief, or when an executor fails and escalation is needed.
+description: Complexity-based routing of tasks across four model tiers — frontier (T3), strong workhorse (T2), fast executor (T1), read-only recon (T0). Use when planning any multi-step work, when deciding which subagent should execute a task, when writing a dispatch brief, or when an executor fails and escalation is needed.
 ---
 
 # Model Routing
 
 ## 0. Ledger pre-check — posterior beats prior
 
-Before scoring anything, read `.claude/routing-ledger.md`, in this order:
+Before scoring anything, apply the safety gates, then read the state:
+- Critical work or risk 3 → T3, regardless of learned defaults.
+- Any QUARANTINE entry for the class → T3; revise before reuse.
 - Class has a live **repo-playbook** entry recorded under another binding
   epoch → RECERTIFY at the entry's provenance tier (`tier-decay` §3).
 - Class has a live **repo-playbook** entry (not quarantined, floor not
@@ -32,12 +34,12 @@ Score the task on four axes; sum the points.
 Route:
 - **0–3 → [T1]** `executor` (fast tier)
 - **4–6 → [T2]** `heavy-executor` (strong workhorse)
-- **≥7, or any axis at its maximum → [T3]**: the frontier tier produces the spec
+- **≥7, or any axis scores 3 → [T3]**: the frontier tier produces the spec
   (main thread, or `oracle` SOLVE) → `heavy-executor` implements it → `oracle`
   REVIEWs the diff.
 
-Tie-breaks: strong existing test coverage → down one tier. Critical path, or
-first task in an unfamiliar area → up one tier.
+Only reasoning and risk can score 3; ambiguity and blast radius stop at 2.
+Test coverage does not override the calculation. Mark critical work explicitly.
 
 ## 2. Fast lane (skip scoring when obvious)
 

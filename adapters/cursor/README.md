@@ -23,7 +23,7 @@ so the tiers compress onto the models you select:
 |-----------|------------------|
 | T3 | Top frontier model (Claude Opus-class / GPT-5.x) in the picker; use **Plan mode** for RECON/PLAN |
 | T2 | Mid model (Claude Sonnet-class / Cursor Composer) |
-| T1 / T0 | Cheapest default in the picker — read-only recon rides the same tier |
+| T1 / T0 | Fast workhorse in the picker — read-only recon rides the same tier |
 
 Recent builds (Cursor 2.x/3) can expose **per-surface / per-mode default models**
 (Agent / Ask / Plan) — bind T3 to the Agent/Plan surface and a cheaper model to

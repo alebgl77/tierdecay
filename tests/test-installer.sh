@@ -682,24 +682,59 @@ run_install "$project" --uninstall agents
 assert_content 'concurrent user replacement' "$project/AGENTS.md"
 ok "quarantine closes the compare/remove replacement race"
 
-project="$(new_project concurrent)"
-run_install "$project" agents &
-pid_agents=$!
-run_install "$project" gemini &
-pid_gemini=$!
-wait "$pid_agents"
-wait "$pid_gemini"
-assert_exists "$project/AGENTS.md"
-assert_exists "$project/GEMINI.md"
-run_install "$project" --uninstall agents
-assert_missing "$project/AGENTS.md"
-assert_exists "$project/GEMINI.md"
-run_install "$project" --uninstall gemini
-assert_missing "$project/GEMINI.md"
-if find "$project" \( -name 'install.lock' -o -name 'stage-*' -o -name '.tierdecay-uninstall.*' \) -print -quit | grep -q .; then
-  printf 'FAIL: installer left temporary staging paths\n' >&2
+project="$(new_project manifest-write-failure)"
+fail_bin="$TMP_ROOT/fail-mv-bin"
+real_mv="$(command -v mv)"
+mkdir -p "$fail_bin" "$project/.tierdecay"
+printf '%s\n' 'learned state sentinel' > "$project/.tierdecay/ledger.md"
+cat > "$fail_bin/mv" <<'SH'
+#!/usr/bin/env bash
+case " $* " in
+  *install-manifest.tsv*) exit 73 ;;
+esac
+exec "$REAL_MV" "$@"
+SH
+chmod +x "$fail_bin/mv"
+if (cd "$project" && PATH="$fail_bin:$PATH" REAL_MV="$real_mv" bash "$INSTALLER" agents) >"$TMP_ROOT/failed-manifest.log" 2>&1; then
+  printf 'FAIL: manifest write failure was reported as success\n' >&2
   exit 1
 fi
-ok "concurrent installs serialize manifest updates without leaks"
+grep -q 'could not commit ownership manifest' "$TMP_ROOT/failed-manifest.log"
+assert_content 'learned state sentinel' "$project/.tierdecay/ledger.md"
+assert_missing "$project/.tierdecay/install.lock"
+ok "manifest commit failures are explicit and preserve learned state"
+
+# Repeat the overlap and wait for both children before cleanup on failure.
+# Keep per-process traces so an intermittent lock regression is diagnosable.
+for round in 1 2 3 4 5; do
+  project="$(new_project "concurrent-$round")"
+  agents_log="$TMP_ROOT/concurrent-$round-agents.log"
+  gemini_log="$TMP_ROOT/concurrent-$round-gemini.log"
+  (cd "$project" && bash -x "$INSTALLER" agents) >"$agents_log" 2>&1 &
+  pid_agents=$!
+  (cd "$project" && bash -x "$INSTALLER" gemini) >"$gemini_log" 2>&1 &
+  pid_gemini=$!
+  agents_status=0
+  gemini_status=0
+  wait "$pid_agents" || agents_status=$?
+  wait "$pid_gemini" || gemini_status=$?
+  if [ "$agents_status" -ne 0 ] || [ "$gemini_status" -ne 0 ]; then
+    printf 'FAIL: concurrent round %s: agents=%s gemini=%s\n' "$round" "$agents_status" "$gemini_status" >&2
+    cat "$agents_log" "$gemini_log" >&2
+    exit 1
+  fi
+  assert_exists "$project/AGENTS.md"
+  assert_exists "$project/GEMINI.md"
+  run_install "$project" --uninstall agents
+  assert_missing "$project/AGENTS.md"
+  assert_exists "$project/GEMINI.md"
+  run_install "$project" --uninstall gemini
+  assert_missing "$project/GEMINI.md"
+  if find "$project" \( -name 'install.lock' -o -name 'install-stage.*' -o -name 'stage-*' -o -name '.tierdecay-uninstall.*' \) -print -quit | grep -q .; then
+    printf 'FAIL: installer left temporary staging paths\n' >&2
+    exit 1
+  fi
+done
+ok "concurrent installs serialize manifest updates without leaks (5 rounds)"
 
 printf 'PASS: %d installer checks\n' "$pass"

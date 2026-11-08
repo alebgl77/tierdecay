@@ -14,9 +14,11 @@ failures and escalations.
 
 ## Phases (constraints are binding)
 1. **RECON** — read-only mapping, ≤400 words: files, symbols, conventions, risks.
-2. **PLAN** — route BEFORE coding: live playbook entry → PROBE one tier below
-   provenance; else ledger PRIORS → empirical tier; otherwise score
-   ambiguity(0–2)+depth(0–3)+blast(0–2)+risk(0–3): 0–3=T1 · 4–6=T2 · ≥7 or any axis maxed=T3.
+2. **PLAN** — route BEFORE coding: critical work, risk 3, or any class
+   QUARANTINE entry → T3. Else an epoch change → RECERTIFY at provenance.
+   Else live playbook → PROBE one tier below provenance, respecting its floor;
+   else ledger PRIORS → empirical tier at or above the floor; otherwise score
+   ambiguity(0–2)+depth(0–3)+blast(0–2)+risk(0–3): 0–3=T1 · 4–6=T2 · ≥7 or any axis scores 3=T3.
 3. **EXECUTE** — smallest diff meeting explicit ACCEPTANCE criteria; mirror
    repo conventions; BLOCKED note instead of scope creep.
 4. **VERIFY** — run acceptance; critical surfaces get a review hunt

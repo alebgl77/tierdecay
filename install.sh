@@ -14,8 +14,9 @@ UNINSTALL=0
 MANIFEST_REL=".tierdecay/install-manifest.tsv"
 MANIFEST="$DEST/$MANIFEST_REL"
 MANIFEST_HEADER="# tierdecay install manifest v1"
-LOCK_DIR="$DEST/.tierdecay/install.lock"
+LOCK_FILE="$DEST/.tierdecay/install.lock"
 LOCK_HELD=0
+STAGING_DIR=""
 STAGE_SEQ=0
 QUARANTINE_SEQ=0
 LOCK_FILES=()
@@ -122,9 +123,10 @@ release_lock() {
   for staged in ${LOCK_FILES[@]+"${LOCK_FILES[@]}"}; do
     if [ -e "$staged" ] || [ -L "$staged" ]; then rm -f "$staged" 2>/dev/null || true; fi
   done
-  if ! rmdir "$LOCK_DIR" 2>/dev/null; then
-    warn "could not remove installer lock $LOCK_DIR; remove it after checking for recovery files"
+  if [ -n "$STAGING_DIR" ] && ! rmdir "$STAGING_DIR" 2>/dev/null; then
+    warn "could not remove installer staging directory $STAGING_DIR; check it for recovery files"
   fi
+  rm -f "$LOCK_FILE" || warn "could not remove installer lock $LOCK_FILE"
   LOCK_HELD=0
 }
 
@@ -139,27 +141,33 @@ cleanup() {
 acquire_lock() {
   [ "$DRY_RUN" = 1 ] && return
   local attempts=0
-  assert_safe_destination "$LOCK_DIR"
+  assert_safe_destination "$LOCK_FILE"
   mkdir -p "$DEST/.tierdecay"
-  assert_safe_destination "$LOCK_DIR"
-  while ! mkdir "$LOCK_DIR" 2>/dev/null; do
-    [ ! -L "$LOCK_DIR" ] || die "refusing symlinked installer lock: $LOCK_DIR"
+  assert_safe_destination "$LOCK_FILE"
+  # Some uutils mkdir releases return success to concurrent losers (upstream
+  # coreutils#13970). Bash noclobber uses exclusive file creation instead.
+  # An old directory-style lock also blocks this acquisition without changes.
+  while ! { [ ! -e "$LOCK_FILE" ] && [ ! -L "$LOCK_FILE" ] &&
+    (umask 077; set -C; : > "$LOCK_FILE"); } 2>/dev/null; do
+    [ ! -L "$LOCK_FILE" ] || die "refusing symlinked installer lock: $LOCK_FILE"
     attempts=$((attempts + 1))
-    [ "$attempts" -lt 300 ] || die "another TierDecay operation holds $LOCK_DIR"
+    [ "$attempts" -lt 300 ] || die "another TierDecay operation holds $LOCK_FILE"
     sleep 0.1
-    assert_safe_destination "$LOCK_DIR"
+    assert_safe_destination "$LOCK_FILE"
   done
   LOCK_HELD=1
   trap 'cleanup $?' EXIT
   trap 'exit 129' HUP
   trap 'exit 130' INT
   trap 'exit 143' TERM
+  STAGING_DIR="$(mktemp -d "$DEST/.tierdecay/install-stage.XXXXXX")" \
+    || die "could not create installer staging directory"
 }
 
-new_lock_stage() { # sets STAGED to a unique path under the held lock
+new_lock_stage() { # unique private staging path while the lock is held
   [ "$LOCK_HELD" = 1 ] || die "internal error: manifest mutation without installer lock"
   STAGE_SEQ=$((STAGE_SEQ + 1))
-  STAGED="$LOCK_DIR/stage-$STAGE_SEQ"
+  STAGED="$STAGING_DIR/stage-$STAGE_SEQ"
   if [ -e "$STAGED" ] || [ -L "$STAGED" ]; then
     die "unexpected installer staging collision: $STAGED"
   fi
@@ -340,7 +348,7 @@ manifest_record() { # manifest_record <source> <destination>
   printf '%s\t%s\t%s\n' "$TARGET" "$dest_rel" "$src_rel" >> "$STAGED" || { rm -f "$STAGED"; die "could not stage ownership manifest entry"; }
   assert_safe_destination "$MANIFEST"
   [ ! -L "$MANIFEST" ] || die "ownership manifest became symlinked during installation"
-  mv "$STAGED" "$MANIFEST"
+  mv "$STAGED" "$MANIFEST" || die "could not commit ownership manifest"
 }
 
 # --- copy helpers (never clobber; dry-run aware) ---------------------------
@@ -358,7 +366,7 @@ do_cp() { # do_cp <src> <dest> [label]
   assert_safe_destination "$2"
   if ln "$STAGED" "$2" 2>/dev/null; then
     rm -f "$STAGED"
-    manifest_record "$1" "$2"
+    manifest_record "$1" "$2" || die "could not record ownership for ${3:-$2}"
     say "installed ${3:-$2}"
     return 0
   fi
@@ -469,7 +477,7 @@ preflight_state_paths() {
 preflight_install_paths() {
   local f rel
   assert_safe_destination "$MANIFEST"
-  assert_safe_destination "$LOCK_DIR"
+  assert_safe_destination "$LOCK_FILE"
   case "$TARGET" in
     claude)
       assert_safe_destination "$DEST/CLAUDE.md"

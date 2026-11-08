@@ -6,11 +6,13 @@ playbook, and the decay rules on top. State: `.tierdecay/ledger.md`,
 `.tierdecay/playbook.md` (add both with `/read-only .tierdecay/`).
 
 ## Rules for the architect
-- Recon first (read-only, ≤400 words), then route before designing: a live
+- Recon first (read-only, ≤400 words). Critical work, risk 3, or any class
+  QUARANTINE entry → T3; an epoch change → RECERTIFY at provenance.
+  Respect sticky floors, then route before designing: a live
   playbook entry (not quarantined) outranks PRIORS — the editor model gets the
   entry verbatim and you keep your design minimal (PROBE); else PRIORS (≥3
   rows) override scoring. Otherwise score ambiguity+depth+blast+risk
-  (0–3=T1 · 4–6=T2 · ≥7 or any axis maxed=T3) and say which tier the task deserved.
+  (0–3=T1 · 4–6=T2 · ≥7 or any axis scores 3=T3) and say which tier the task deserved.
 - Every design carries explicit ACCEPTANCE criteria the editor must satisfy.
 - Critical surfaces (security, auth, money, migrations, public contracts):
   end with a review hunt — boundaries, races, injection, authz, silent data

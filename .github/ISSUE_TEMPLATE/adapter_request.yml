@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        An adapter maps TierDecay's four tiers (T3 frontier / T2 strong / T1 fast / T0 cheapest) onto a
+        An adapter maps TierDecay's four tiers (T3 frontier / T2 strong / T1 fast / T0 read-only) onto a
         specific CLI's native context file and model-switching mechanism. The more precisely you can
         describe that mapping, the faster the adapter can be written or reviewed.
   - type: input

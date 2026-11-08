@@ -25,7 +25,7 @@ by hand from `.tierdecay/ledger.md` and `.tierdecay/playbook.md`:
 5. Class in ledger PRIORS (≥3 rows) → its empirical tier.
 6. Otherwise score the rubric: ambiguity 0–2, reasoning depth 0–3, blast
    radius 0–2, risk surface 0–3. **0–3 → T1 · 4–6 → T2 · ≥7 or any axis
-   maxed → T3**. Strong tests → down one; critical path → up one.
+   scores 3 → T3**. Test coverage does not override the calculation.
 
 Class signature: 2–4 hyphenated tokens, `verb-object-surface`
 (`add-endpoint-rest`). Reuse an existing signature before minting one.

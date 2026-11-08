@@ -17,6 +17,8 @@ body:
       description: Which adapter were you running?
       options:
         - claude-code
+        - codex
+        - antigravity
         - agents-md
         - cursor
         - gemini-cli

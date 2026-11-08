@@ -14,7 +14,8 @@ Cline binds two model slots, so the four tiers compress onto its Plan/Act split:
 |-----------|-----------|---------|
 | T3        | Plan-mode model | strongest (Opus-class) |
 | T2        | (no native slot) | Plan model, or swap Act to a mid-tier model |
-| T1 / T0   | Act-mode model  | fast/cheap (Sonnet-class) |
+| T1        | Act-mode model  | fast workhorse (Sonnet-class) |
+| T0        | Plan-mode model | read-only recon; uses the T3 model |
 
 Enable it under Settings → **"Use different models for Plan and Act"**, then set
 each dropdown. Switching Plan↔Act auto-swaps the model and keeps history.

@@ -62,6 +62,7 @@ function routes(state) {
 }
 
 function why(route) {
+  if (route.source === 'risk3') return 'risk-3: T3 required';
   if (route.source === 'playbook') return `${route.action} via ${route.playbook}`;
   if (route.source === 'quarantined') return `${route.playbook} quarantined: fail closed`;
   if (route.source === 'sticky-floor') return 'sticky floor';
@@ -158,7 +159,16 @@ function skillDocument(entry, body) {
 
 // Writes one Agent Skills directory per LIVE entry under `out`, and removes
 // previously generated TierDecay skills that are no longer live (for example a
-// newly quarantined entry). Directories it did not generate are never touched.
+// newly quarantined entry). Unowned files and sibling content are preserved.
+function ownedSkill(file) {
+  if (!fs.existsSync(file)) return false;
+  const stat = fs.lstatSync(file);
+  if (!stat.isFile() || stat.isSymbolicLink()) return false;
+  const text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+  const frontmatter = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(text);
+  return Boolean(frontmatter && frontmatter[1].includes(`\nmetadata:\n  ${GENERATED_MARKER}\n`));
+}
+
 function exportSkills(playbook, playbookText, out) {
   if (!out) throw Object.assign(new Error('--format skills requires --out DIR'), { exitCode: 2 });
   const root = path.resolve(out);
@@ -168,6 +178,16 @@ function exportSkills(playbook, playbookText, out) {
   const wanted = new Map(live.map((entry) => [skillName(entry), entry]));
   const written = [];
   const removed = [];
+  // Preflight every destination before the first write. A same-name manual
+  // skill or a symlink is not permission to replace somebody else's content.
+  for (const name of wanted.keys()) {
+    const dir = path.join(root, name);
+    const stat = fs.lstatSync(dir, { throwIfNoEntry: false });
+    if (!stat) continue;
+    if (!stat.isDirectory() || stat.isSymbolicLink() || !ownedSkill(path.join(dir, 'SKILL.md'))) {
+      throw Object.assign(new Error(`refusing to overwrite unowned skill: ${name}`), { exitCode: 3 });
+    }
+  }
   for (const [name, entry] of [...wanted].sort(([a], [b]) => (a < b ? -1 : 1))) {
     const dir = path.join(root, name);
     fs.mkdirSync(dir, { recursive: true });
@@ -176,9 +196,13 @@ function exportSkills(playbook, playbookText, out) {
   }
   for (const name of fs.readdirSync(root).sort()) {
     if (!name.startsWith(SKILL_PREFIX) || wanted.has(name)) continue;
-    const file = path.join(root, name, 'SKILL.md');
-    if (!fs.existsSync(file) || !fs.readFileSync(file, 'utf8').includes(GENERATED_MARKER)) continue;
-    fs.rmSync(path.join(root, name), { recursive: true, force: true });
+    const dir = path.join(root, name);
+    const stat = fs.lstatSync(dir);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) continue;
+    const file = path.join(dir, 'SKILL.md');
+    if (!ownedSkill(file)) continue;
+    fs.unlinkSync(file);
+    if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
     removed.push(name);
   }
   return { schemaVersion: 1, out: root, written, removed };
@@ -186,8 +210,8 @@ function exportSkills(playbook, playbookText, out) {
 
 function exportPosterior({ ledger, playbook, playbookText, epoch, format, out }) {
   if (!FORMATS.includes(format)) throw Object.assign(new Error(`format must be one of ${FORMATS.join(', ')}`), { exitCode: 2 });
-  if (format === 'skills') return { kind: 'json', value: exportSkills(playbook, playbookText, out) };
   const state = status({ ledger, playbook, epoch });
+  if (format === 'skills') return { kind: 'json', value: exportSkills(playbook, playbookText, out) };
   if (format === 'json') return { kind: 'json', value: exportJson(state) };
   const render = { claude: exportClaude, codex: exportCodex, antigravity: exportAntigravity, cursor: exportCursor }[format];
   return { kind: 'text', value: render(state) };

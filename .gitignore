@@ -1,5 +1,6 @@
 .DS_Store
 node_modules/
+graphify-out/
 
 # TierDecay installer artifacts (generated inside a target repo)
 .tierdecay/

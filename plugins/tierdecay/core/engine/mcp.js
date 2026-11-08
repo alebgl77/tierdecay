@@ -10,7 +10,7 @@
 // protocol forbids from writing state (SPEC §5.1). Start it that way only for
 // the orchestrator's own session.
 const readline = require('node:readline');
-const { route, rubricTier } = require('./route');
+const { route, rubricTier, resolveClassState } = require('./route');
 const { status } = require('./status');
 const { exportPosterior, FORMATS } = require('./export');
 const { doctor } = require('./doctor');
@@ -82,7 +82,7 @@ const TOOLS = [
   {
     name: 'tierdecay_rubric',
     title: 'Score the cold-start rubric',
-    description: 'Score the four-axis rubric for a class with no playbook entry or PRIORS row: 0-3 → T1, 4-6 → T2, ≥7 or any axis maxed → T3.',
+    description: 'Score the four-axis rubric for a class with no playbook entry or PRIORS row: 0-3 → T1, 4-6 → T2, ≥7 or any axis scores 3 → T3.',
     inputSchema: { type: 'object', additionalProperties: false, required: ['rubric'], properties: { rubric: RUBRIC_SCHEMA } },
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
   },
@@ -164,10 +164,9 @@ function createServer({ root, overrides = {}, allowAppend = false } = {}) {
     },
     tierdecay_playbook({ class: taskClass, epoch }) {
       const state = loadState(paths());
-      const entries = state.playbook.entries.filter((entry) => entry.class === taskClass);
-      const live = entries.find((entry) => entry.status === 'live');
+      const { entries, live } = resolveClassState({ class: taskClass }, state.playbook);
       const quarantined = entries.find((entry) => entry.status === 'quarantined');
-      if (quarantined) return { class: taskClass, status: 'quarantined', id: quarantined.id, guidance: 'Never apply a quarantined entry; route by the rubric at or above its floor and revise the entry.' };
+      if (quarantined) return { class: taskClass, status: 'quarantined', id: quarantined.id, guidance: 'Never apply a quarantined entry; route to T3 (fail closed) and revise the entry.' };
       if (!live) return { class: taskClass, status: 'none', guidance: 'No entry: route by PRIORS or the rubric.' };
       const body = playbookBlocks(state.playbookText).get(live.id) || [];
       return {

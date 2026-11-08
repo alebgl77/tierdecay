@@ -71,8 +71,8 @@ RAISED one tier in PRIORS. Calibration runs both directions.
 - **Only the main thread writes under `.claude/**`.** Any executor diff
   touching it is rejected at VERIFY — a poisoned playbook self-replicates.
   Executors are also blocked in-tool by their `tierdecay-guard.sh` hook, and
-  `settings.json` ask-gates state writes; treat an unexpected approval prompt
-  as the alarm, not noise.
+  installed `settings.json` permission rules ask-gate state writes. Plugin
+  users opt into those rules separately; VERIFY remains mandatory.
 - Any acceptance failure while an entry was referenced → immediate quarantine.
 - Entries are pattern-level and repo-specific; generic best practices belong
   in `execution-standards`, not here.

@@ -19,9 +19,9 @@ adapter.
   review of critical diffs.
 - **T2** strong workhorse — a mid-tier "Thinking" model for refactors,
   concurrency, migrations, perf.
-- **T1** fast/cheap — the cheapest default model in the dropdown (check your
+- **T1** fast/cheap — a fast workhorse model in the dropdown (check your
   build's list) for specced features, tests, docs, mechanical edits.
-- **T0** cheapest — same fast/cheap tier, read-only recon.
+- **T0** fast workhorse, low effort — same fast/cheap tier, read-only recon.
 
 No confirmed CLI flag or config file forces a default model non-interactively
 — switching means picking it in the dropdown per message, or naming it inside
@@ -35,13 +35,15 @@ match.
 1. **RECON** — read-only. Map relevant files, symbols, conventions, risks in
    ≤400 words. No edits, no opinions.
 2. **PLAN** — route every task BEFORE touching code:
+   - critical work or risk 3 → T3; any QUARANTINE entry for the class → T3;
+   - live entry from another epoch → RECERTIFY at provenance, entry quoted;
    - class has a live entry in `.tierdecay/playbook.md` (not quarantined,
      floor not reached) → PROBE one tier below the entry's provenance, entry
      quoted in your working notes; a live entry outranks PRIORS;
    - else class listed in `.tierdecay/ledger.md` PRIORS → use its empirical
      default tier, skip scoring;
    - otherwise score: ambiguity(0–2) + depth(0–3) + blast-radius(0–2) +
-     risk(0–3) → 0–3 = T1 · 4–6 = T2 · ≥7 or any axis maxed = T3.
+     risk(0–3) → 0–3 = T1 · 4–6 = T2 · ≥7 or any axis scores 3 = T3.
 3. **EXECUTE** — smallest diff satisfying explicit ACCEPTANCE criteria
    (write them first if the user gave none). Mirror the codebase's
    conventions. Never expand scope: surface a BLOCKED note with 2–3 options

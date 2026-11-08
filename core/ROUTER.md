@@ -1,13 +1,15 @@
-# TierDecay deterministic router (v0.4)
+# TierDecay deterministic router
 
 The router is an optional, local advisor over TierDecay's Markdown state. It
-uses Node.js built-ins only, never edits the ledger or playbook, never calls a
-network service, and never reads the clock or a random source. Markdown remains
-the source of truth.
+uses Node.js built-ins only and never calls a network service. Decisions read
+no clock or random source. Routing never edits state; `observe --append` is
+the explicit ledger write path and uses wall-clock time for lock expiry.
+Skills export writes derived files. Markdown remains the source of truth.
 
 ## Safety model
 
-`shadow` is the default policy. It may calculate an optimized recommendation,
+With an economic configuration, `shadow` is the default policy; without one,
+both CLI and MCP use `legacy`. It may calculate an optimized recommendation,
 but `effective` is byte-for-byte the legacy decision. `optimize` is explicit
 opt-in and requires an enabled, calibrated economic configuration. Critical or
 risk-3 work always routes to T3. T0 is read-only and can never be returned.
@@ -64,7 +66,7 @@ row to stdout; the orchestrator decides whether to append it. With
 instead: exclusive lock file (`LEDGER.lock`, stale after 30 s, timeout 10 s),
 re-parse and re-validate the whole ledger, refuse a duplicate `obs_id`, write
 a temporary file, `fsync`, rename, keep the file mode. This is the engine's
-only write path. `-` means stdin and may be used only once per invocation.
+only learned-state write path. `-` means stdin and may be used only once per invocation.
 
 Exit codes: `0` valid decision or documented shadow fallback; `1` `doctor`
 found a failing check; `2` invalid request/config/arguments; `3` ambiguous or

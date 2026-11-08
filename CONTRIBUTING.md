@@ -23,7 +23,7 @@ is welcome.
 
 ## Add an adapter
 
-**Adapters wanted:** Qwen Code, Amp, Continue, Cody. (Cline, Goose, Windsurf,
+**Adapters wanted:** Qwen Code, Amp, Continue, Kiro. (Cline, Goose, Windsurf,
 and Cursor now ship in-tree — use them as worked examples.)
 
 An adapter is one folder under `adapters/` containing:
@@ -51,7 +51,7 @@ switch between:
 | T3 | plan / review | your frontier model |
 | T2 | complex execution | your strong workhorse |
 | T1 | standard execution | your fast/cheap model |
-| T0 | read-only recon | your cheapest model |
+| T0 | read-only recon | your fast workhorse at low effort |
 
 Keep `install.sh` target cases, preflight plans, and the ownership/source
 allowlist in sync. Copy the context file, seed state (`seed_state` for
@@ -96,6 +96,7 @@ node tests/test-router.js
 node tests/test-posterior.js
 node tests/test-production.js             # MCP, doctor, locked append, completion
 node tests/test-adapters.js               # Codex and Antigravity schemas and bindings
+node tests/test-coherence.js              # CLI/MCP parity, risk gates, export ownership
 node scripts/build-plugin.js --check      # plugin and Codex guard mirror in sync
 node scripts/build-diagrams.js --check    # docs/diagrams generated and in sync
 node benchmarks/pilot-v1/harness.js validate
