@@ -682,6 +682,28 @@ run_install "$project" --uninstall agents
 assert_content 'concurrent user replacement' "$project/AGENTS.md"
 ok "quarantine closes the compare/remove replacement race"
 
+project="$(new_project manifest-write-failure)"
+fail_bin="$TMP_ROOT/fail-mv-bin"
+real_mv="$(command -v mv)"
+mkdir -p "$fail_bin" "$project/.tierdecay"
+printf '%s\n' 'learned state sentinel' > "$project/.tierdecay/ledger.md"
+cat > "$fail_bin/mv" <<'SH'
+#!/usr/bin/env bash
+case " $* " in
+  *install-manifest.tsv*) exit 73 ;;
+esac
+exec "$REAL_MV" "$@"
+SH
+chmod +x "$fail_bin/mv"
+if (cd "$project" && PATH="$fail_bin:$PATH" REAL_MV="$real_mv" bash "$INSTALLER" agents) >"$TMP_ROOT/failed-manifest.log" 2>&1; then
+  printf 'FAIL: manifest write failure was reported as success\n' >&2
+  exit 1
+fi
+grep -q 'could not commit ownership manifest' "$TMP_ROOT/failed-manifest.log"
+assert_content 'learned state sentinel' "$project/.tierdecay/ledger.md"
+assert_missing "$project/.tierdecay/install.lock"
+ok "manifest commit failures are explicit and preserve learned state"
+
 # Repeat the overlap and wait for both children before cleanup on failure.
 # Keep per-process traces so an intermittent lock regression is diagnosable.
 for round in 1 2 3 4 5; do
@@ -708,7 +730,7 @@ for round in 1 2 3 4 5; do
   assert_exists "$project/GEMINI.md"
   run_install "$project" --uninstall gemini
   assert_missing "$project/GEMINI.md"
-  if find "$project" \( -name 'install.lock' -o -name 'stage-*' -o -name '.tierdecay-uninstall.*' \) -print -quit | grep -q .; then
+  if find "$project" \( -name 'install.lock' -o -name 'install-stage.*' -o -name 'stage-*' -o -name '.tierdecay-uninstall.*' \) -print -quit | grep -q .; then
     printf 'FAIL: installer left temporary staging paths\n' >&2
     exit 1
   fi

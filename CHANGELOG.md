@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning][semver].
 
 ### Fixed
 
+- Acquire the installer lock with exclusive file creation to tolerate affected
+  uutils `mkdir` versions; isolate staging and report manifest commit failures.
 - Keep risk-3 classes at T3 in status and routing exports. Validate standalone
   MCP rubric input and align the CLI default policy with MCP on fresh installs.
 - Reject unowned skill export collisions before writing; preserve sibling
