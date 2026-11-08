@@ -15,22 +15,28 @@ function validateRequest(request) {
   if (!Number.isSafeInteger(request.horizon) || request.horizon < 1) throw new ValidationError('request.horizon must be a positive safe integer');
   if (!request.epoch || typeof request.epoch !== 'string' || /\s/.test(request.epoch)) throw new ValidationError('request.epoch must be a non-empty token');
   if (request.playbook !== undefined && !/^PB-[1-9][0-9]*$/.test(request.playbook)) throw new ValidationError('request.playbook must be a PB-n id');
-  if (!request.rubric || typeof request.rubric !== 'object') throw new ValidationError('request.rubric is required');
+  validateRubric(request.rubric);
   const allowed = new Set(['class', 'risk', 'critical', 'recurring', 'horizon', 'epoch', 'playbook', 'rubric']);
   for (const key of Object.keys(request)) if (!allowed.has(key)) throw new ValidationError(`unknown request property: ${key}`);
-  const axes = ['ambiguity', 'reasoning', 'blastRadius', 'riskSurface'];
-  for (const key of Object.keys(request.rubric)) if (!axes.includes(key)) throw new ValidationError(`unknown rubric property: ${key}`);
-  for (const axis of axes) {
-    const maximum = axis === 'reasoning' || axis === 'riskSurface' ? 3 : 2;
-    if (!Number.isInteger(request.rubric[axis]) || request.rubric[axis] < 0 || request.rubric[axis] > maximum) {
-      throw new ValidationError(`rubric.${axis} must be an integer from 0 to ${maximum}`);
-    }
-  }
   if (request.risk !== request.rubric.riskSurface) throw new ValidationError('request.risk must equal rubric.riskSurface');
   return { ...request, rubric: { ...request.rubric } };
 }
 
+function validateRubric(rubric) {
+  if (!rubric || typeof rubric !== 'object' || Array.isArray(rubric)) throw new ValidationError('rubric must be an object');
+  const axes = ['ambiguity', 'reasoning', 'blastRadius', 'riskSurface'];
+  for (const key of Object.keys(rubric)) if (!axes.includes(key)) throw new ValidationError(`unknown rubric property: ${key}`);
+  for (const axis of axes) {
+    const maximum = axis === 'reasoning' || axis === 'riskSurface' ? 3 : 2;
+    if (!Number.isInteger(rubric[axis]) || rubric[axis] < 0 || rubric[axis] > maximum) {
+      throw new ValidationError(`rubric.${axis} must be an integer from 0 to ${maximum}`);
+    }
+  }
+  return rubric;
+}
+
 function rubricTier(rubric) {
+  validateRubric(rubric);
   const values = Object.values(rubric);
   const score = values.reduce((sum, value) => sum + value, 0);
   if (values.includes(3) || score >= 7) return { tier: 'T3', score };

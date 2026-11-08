@@ -1,5 +1,9 @@
 # Repo Playbook (auto-distilled) — TierDecay self-build
 
+> Historical July 2026 example, recorded before v0.4. Its two-hit decay rule
+> is not the current policy: use 3/4/5 passes for risk 0/1/2, default risk 2.
+> Recorded outcomes below are preserved; this is not a current routing template.
+
 <!-- HARD CAP: 150 lines. Eviction: lowest hits, oldest first.   -->
 <!-- Written ONLY during DISTILL. Executors read, apply, report. -->
 

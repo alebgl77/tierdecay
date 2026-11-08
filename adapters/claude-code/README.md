@@ -24,7 +24,8 @@ over successful reuses. First-reuse break-even is conditional on fully loaded,
 same-unit costs: the one-time cost must satisfy
 `C_distill ≤ C_hi - C_lo`, where `C_lo` is the expected cost of a reuse attempt
 beginning at the low tier, including routing, verification, failed probes, and
-escalations. TierDecay has no published benchmark.
+escalations. A small [controlled pilot](../../benchmarks/pilot-v1/RESULTS.md) is published;
+it does not establish production savings or an advantage over a native router.
 
 Anti-poisoning defenses (the failure mode of any self-modifying system):
 - Only the main thread writes under `.claude/**`; VERIFY rejects executor

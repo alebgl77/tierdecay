@@ -100,7 +100,7 @@ a protocol — no proxy, no daemon, no SDK:
 | `PLAYBOOK` | High-tier solutions compiled into low-tier instructions | **Compilation target** |
 
 <div align="center">
-<img src="assets/three-files.png" alt="Three document cards — SPEC (compass), LEDGER (table), PLAYBOOK (layers) — connected in a cycle" width="680" />
+<img src="docs/diagrams/state-overview.svg" alt="SPEC, LEDGER and PLAYBOOK feed one deterministic advisor exposed through CLI, MCP and routing exports" width="920" />
 </div>
 
 When an expensive model solves a hard problem, the orchestrator distills the
@@ -118,7 +118,11 @@ distribution, and only as fast as the evidence allows.
 
 ```mermaid
 flowchart TD
-    A([New task]) --> B{Live playbook<br/>entry?}
+    A([New task]) --> S{Critical or risk 3?}
+    S -- yes --> X[T3 safety]
+    S -- no --> Q{Class quarantined?}
+    Q -- yes --> X
+    Q -- no --> B{Live playbook<br/>entry?}
     B -- "yes, other epoch" --> R[RECERTIFY at provenance<br/>model or effort changed]
     B -- yes --> E[PROBE: one tier below provenance<br/>entry quoted in the brief]
     B -- no --> D{Class in<br/>ledger PRIORS?}
@@ -127,10 +131,12 @@ flowchart TD
     F --> G{Sum}
     G -- "0–3" --> T1[T1 — cheap executor]
     G -- "4–6" --> T2[T2 — heavy executor]
-    G -- "≥7 or any axis maxed" --> T3[T3 — frontier specs<br/>T2 implements · T3 reviews]
+    G -- "≥7 or any axis scores 3" --> T3[T3 — frontier specs<br/>T2 implements · T3 reviews]
     E -- pass --> H[hits +1<br/>3/4/5 hits by risk ⇒ tier drops]
-    E -- fail --> I[Entry quarantined<br/>sticky floor · escalate normally]
+    E -- fail --> I[Entry quarantined<br/>sticky floor · next route T3]
 ```
+
+Sticky floors apply to every fallback and probe. T1 is the execution floor.
 
 ### One task, end to end
 
@@ -241,7 +247,7 @@ overhead for this illustration only. Failures or escalations would raise the
 realized cumulative cost above the table.
 
 <div align="center">
-<img src="assets/economics.png" alt="A staircase of blocks stepping down from amber through teal to a long flat row of small green blocks — cost collapsing as classes decay to cheaper tiers" width="720" />
+<img src="docs/diagrams/economics.svg" alt="Illustrative cumulative costs over five tasks: static 1 to 5 units; TierDecay 1.1 to 1.9 units, assuming every cheaper reuse succeeds. Not benchmark evidence." width="920" />
 </div>
 
 Health metric: the `executed` column of your ledger should drift toward T1
@@ -250,8 +256,10 @@ over time for recurring classes. **That drift is the product.**
 ## Deterministic engine, CLI, and MCP server
 
 An optional local Node.js engine reads the same Markdown ledger and playbook.
-No runtime dependencies, network calls, daemon, clock, or random source. Its
-only write path is a validated, locked, atomic ledger append.
+No runtime dependencies, network calls, or daemon. Routing decisions use no
+clock or random source. The only learned-state write is a validated, locked,
+atomic ledger append; lock expiry uses wall-clock time. Skills export writes
+derived files and removes its stale generated instructions.
 
 ```bash
 tierdecay status                    # per class: route, hits vs. required, what the orchestrator owes
@@ -300,7 +308,7 @@ fails if the SVGs drift from the generator.
 | Containers | [`Dockerfile`](Dockerfile): distroless `nonroot`, base images pinned by digest, runs with `--read-only --network none` |
 | Concurrency | ledger appends take an exclusive lock, re-validate, `fsync`, and rename; stale locks are broken after 30 s |
 | Supply chain | releases are cut by CI from a tag on `main` after the full matrix passes; archive + CycloneDX SBOM + `SHA256SUMS` |
-| Operations | stable exit codes, bash completion, canonical JSON output, no clock or randomness |
+| Operations | stable exit codes, bash completion, canonical JSON output, deterministic routing decisions |
 
 Full guide: [`docs/PRODUCTION.md`](docs/PRODUCTION.md).
 
@@ -337,7 +345,8 @@ For production, use only the
 [latest tagged release](https://github.com/alebgl77/tierdecay/releases/latest).
 `main` is unreleased development and is intended for evaluation and
 contribution, not production use. Download both `tierdecay-<version>.tar.gz`
-and `SHA256SUMS` from the release into the same directory, then verify the
+along with `tierdecay-<version>.cdx.json` and `SHA256SUMS` from the release
+into the same directory, then verify the
 archive before extracting or running its installer:
 
 ```bash
@@ -353,8 +362,8 @@ with the release version you downloaded.
 
 **Prerequisites:** one of the supported CLIs, and `bash` to run the installer —
 already present on macOS and Linux; on **Windows** use Git Bash or WSL. No
-service runtime, package manager, or API key is required. The Claude Code
-adapter requires `node` for its local state-write guard hook. The optional
+service runtime, package manager, or API key is required. The Claude Code and Codex
+adapters require `node` for their local state-write guard hooks. The optional
 router requires Node.js 18+ for every adapter; the Markdown protocol itself
 does not. Nothing is installed globally: the installer only copies files into
 the repo you point it at.
@@ -508,6 +517,12 @@ Skills for the router you already use.
 Every change: [`CHANGELOG.md`](CHANGELOG.md). Next — pilot v2 on classes the
 fast tier fails cold, team ledger merge, OpenTelemetry GenAI export,
 calibration, stable 1.0 contracts: [`ROADMAP.md`](ROADMAP.md).
+
+## Coherence audit
+
+The [November 2026 audit](docs/AUDIT-2026-11-08.md) records cross-interface
+fixes, Graphify evidence, revised diagrams, checks performed and remaining
+live-integration limits.
 
 ## Contributing
 

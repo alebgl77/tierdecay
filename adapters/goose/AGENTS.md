@@ -41,13 +41,15 @@ docs, so treat it as superseded by Plan mode, not a separate mechanism.
 1. **RECON** — read-only, default model. Map files, symbols, conventions,
    risks in ≤400 words. No edits, no opinions.
 2. **PLAN** — route every task BEFORE touching code:
+   - critical work or risk 3 → T3; any QUARANTINE entry for the class → T3;
+   - live entry from another epoch → RECERTIFY at provenance, entry quoted;
    - live entry in `.tierdecay/playbook.md` (not quarantined, floor not
      reached) → PROBE one tier below the entry's provenance, entry quoted in
      your notes; a live entry outranks PRIORS;
    - else class in `.tierdecay/ledger.md` PRIORS → use its empirical default
      tier, skip scoring;
    - else score ambiguity(0–2) + depth(0–3) + blast(0–2) + risk(0–3):
-     0–3 = T1 · 4–6 = T2 · ≥7 or any axis maxed = T3.
+     0–3 = T1 · 4–6 = T2 · ≥7 or any axis scores 3 = T3.
    A T3 verdict → `/plan` for this task; T1/T2 stay in the default session.
 3. **EXECUTE** — `/endplan` first if you were in Plan mode. Smallest diff
    meeting explicit ACCEPTANCE criteria (write them first if the user gave

@@ -12,7 +12,7 @@ tier, plans/routes/verifies), **executors** (do the work), **ledger** and
 | T3 | Planning, architecture, novel algorithms, review of critical diffs | Your frontier model |
 | T2 | Complex execution: refactors, concurrency, migrations, perf | Your strong workhorse |
 | T1 | Standard execution: specced features, tests, docs, mechanical edits | Your fast/cheap model |
-| T0 | Read-only recon: files, symbols, conventions, risks | Your cheapest model |
+| T0 | Read-only recon: files, symbols, conventions, risks | Your fast workhorse at low effort |
 
 Tiers are roles; they are never named after a model version in this spec or in
 any adapter. Bind them through your provider's **latest-tracking alias** where
@@ -28,6 +28,8 @@ changing any model or effort starts a new epoch.
 1. **RECON** — T0 maps the terrain (recon report ≤400 words); the orchestrator
    never explores raw.
 2. **PLAN** — decompose into tasks. Route each task, in this order:
+   - critical work or risk 3 → **T3**, regardless of learned defaults;
+   - class has any **QUARANTINE** entry → **T3**, revise before reuse;
    - class has a live **playbook** entry whose `epoch:` differs from the
      current binding epoch → **RECERTIFY**: run at the entry's provenance tier,
      entry quoted; a pass adopts the new epoch with hits reset to 0;
@@ -59,8 +61,10 @@ Score four axes, sum:
 | Blast radius | 1 file | 2–5 files | >5 or core module | — |
 | Risk surface | cosmetic | user-visible bug | data/perf/concurrency | security, money, irreversible |
 
-**0–3 → T1 · 4–6 → T2 · ≥7 or any axis maxed → T3** (T3 specs, T2
-implements, T3 reviews). Tie-breaks: strong tests → down; critical path → up.
+**0–3 → T1 · 4–6 → T2 · ≥7 or any axis scores 3 → T3** (T3 specs, T2
+implements, T3 reviews). Only reasoning and risk can score 3; ambiguity and
+blast radius stop at 2. Test coverage does not override this calculation.
+Mark critical work explicitly so the T3 safety gate runs before learned routes.
 
 ## 4. Tier decay
 

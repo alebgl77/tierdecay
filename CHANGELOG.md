@@ -9,12 +9,21 @@ and this project adheres to [Semantic Versioning][semver].
 
 ### Changed
 
+- Align adapter safety precedence, rubric wording and model-policy guidance
+  with the engine. Clarify installation checksums and historical examples.
+- Unify diagram tier colors and add exact state and illustrative cost diagrams.
+
 - Clarify pilot-v1 comparisons in the README and results: the cold fast-tier
   cost ratio and the protocol replay saving use different numerators. Keep the
   small-fixture scope, absence of a significant distillation benefit and lack
   of a production-workload savings claim explicit. No new model runs.
 
 ### Fixed
+
+- Keep risk-3 classes at T3 in status and routing exports. Validate standalone
+  MCP rubric input and align the CLI default policy with MCP on fresh installs.
+- Reject unowned skill export collisions before writing; preserve sibling
+  files when removing stale generated instructions. Add cross-surface regressions.
 
 - Tag backfills (`tag-release.yml` dispatch on an earlier commit) verify the
   CI recorded on that commit instead of running today's suite against files

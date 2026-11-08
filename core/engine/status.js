@@ -4,7 +4,7 @@
 // effective default route and the next protocol action the orchestrator owes
 // (recertify, decay, add a PRIORS row, ...). Never writes state.
 const { DECAY_ALPHA, PASS_RATE_FLOOR, REQUIRED_HITS, DEFAULT_ENTRY_RISK, entryDecay } = require('./decay');
-const { TIER_NUMBER, NUMBER_TIER } = require('./route');
+const { TIER_NUMBER, NUMBER_TIER, resolveClassState } = require('./route');
 
 const lexical = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -15,14 +15,13 @@ function classRows(ledger, taskClass) {
 // Default route for a class with no request-specific facts (risk, criticality):
 // the same precedence as SPEC §2 — quarantine, live playbook, PRIORS.
 function defaultRoute(taskClass, ledger, playbook, epoch) {
-  const entries = playbook.entries.filter((entry) => entry.class === taskClass);
-  const live = entries.find((entry) => entry.status === 'live') || null;
+  const { entries, live, floor } = resolveClassState({ class: taskClass }, playbook);
   const quarantined = entries.find((entry) => entry.status === 'quarantined') || null;
-  const floor = entries.map((entry) => entry.floor).find(Boolean) || null;
   const prior = ledger.priors.find((candidate) => candidate.class === taskClass) || null;
   if (quarantined) return { tier: 'T3', action: 'refusal', source: 'quarantined', playbook: quarantined.id, floor };
   if (live) {
     const decay = entryDecay(live, epoch);
+    if (live.risk === 3) return { tier: 'T3', action: 'safety', source: 'risk3', playbook: live.id, floor, decay };
     if (decay.recertify) return { tier: live.provenance, action: 'recertify', source: 'playbook', playbook: live.id, floor, decay };
     if (live.provenance === 'T1') return { tier: 'T1', action: 'exploit', source: 'playbook', playbook: live.id, floor, decay };
     const probe = NUMBER_TIER[TIER_NUMBER[live.provenance] - 1];
@@ -37,6 +36,7 @@ function defaultRoute(taskClass, ledger, playbook, epoch) {
 }
 
 function nextAction(route, rows, prior) {
+  if (route.action === 'safety') return 'risk-3: keep T3; no probe or decay';
   if (route.action === 'recertify') return 'recertify: run at provenance with the entry quoted; reset hits and rewrite epoch on pass';
   if (route.decay && route.decay.decayDue) return `decay: rewrite provenance to ${route.tier}, reset hits to 0`;
   if (route.source === 'quarantined') return 'revise or delete the quarantined entry';

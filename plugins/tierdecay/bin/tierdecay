@@ -10,7 +10,7 @@ const { exportPosterior, FORMATS } = require('../core/engine/export');
 const { bench } = require('../core/engine/bench');
 const { doctor } = require('../core/engine/doctor');
 const { validateObservation, appendObservation } = require('../core/engine/observation');
-const { statePaths, loadState } = require('../core/engine/workspace');
+const { statePaths, loadState, loadConfig } = require('../core/engine/workspace');
 const { VERSION } = require('../core/engine/version');
 
 const COMMANDS = {
@@ -203,8 +203,10 @@ function main(argv) {
       seed: integer(options.seed, 'seed') ?? 1
     }));
   } else if (command === 'route') {
-    const policy = options.policy || 'shadow';
-    const config = policy === 'legacy' ? null : json(options.config || paths.config);
+    const suppliedConfig = options.policy === 'legacy' ? null
+      : options.config ? json(options.config) : loadConfig(paths);
+    const policy = options.policy || (suppliedConfig ? 'shadow' : 'legacy');
+    const config = policy === 'legacy' ? null : suppliedConfig;
     output(route({ request: json(options.request), ledger, playbook, config, policy }));
   } else {
     output(replay({ jsonl: read(options.scenario), ledger, playbook, config: json(options.config || paths.config), policy: options.policy || 'shadow' }));

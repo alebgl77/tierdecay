@@ -1,5 +1,9 @@
 # Self-build: TierDecay's own routing ledger
 
+> Historical July 2026 example, recorded before v0.4. Its two-hit decay rule
+> is not the current policy: use 3/4/5 passes for risk 0/1/2, default risk 2.
+> Recorded outcomes below are preserved; this is not a current routing template.
+
 We used TierDecay to build three of its own adapters — **Cline, Goose, and
 Windsurf** — in a single session, and kept the ledger. It lives here as an
 honest, reproducible artifact: exactly the thing the main README asks *you* to

@@ -10,8 +10,10 @@ This repo runs under the TierDecay protocol. The full adapter lives in
 particular:
 
 - Phase discipline: RECON → PLAN → EXECUTE → VERIFY → DISTILL; announce the
-  current phase and route BEFORE touching code (playbook PROBE outranks ledger
-  PRIORS; otherwise score the 4-axis rubric — ≥7 or any axis maxed = T3).
+  current phase and route BEFORE touching code. Critical work, risk 3, or any
+  class QUARANTINE entry → T3; epoch change → RECERTIFY at provenance.
+  Respect sticky floors (playbook PROBE outranks ledger
+  PRIORS; otherwise score the 4-axis rubric — ≥7 or any axis scores 3 = T3).
 - State integrity: `.tierdecay/` is written ONLY during DISTILL. Any acceptance
   failure while a playbook entry was referenced → QUARANTINE it immediately.
   Never apply a QUARANTINE entry. Playbook hard cap: 150 lines.

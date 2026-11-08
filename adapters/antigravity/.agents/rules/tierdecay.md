@@ -32,7 +32,7 @@ conversation model and mode per tier (T3/T2 Planning, T1 Fast).
    its provenance with the entry quoted verbatim (never below its sticky
    floor); class in ledger PRIORS (≥3 rows) → its tier; otherwise score the rubric —
    ambiguity 0–2, depth 0–3, blast radius 0–2, risk 0–3:
-   **0–3 → T1 · 4–6 → T2 · ≥7 or any axis maxed → T3**.
+   **0–3 → T1 · 4–6 → T2 · ≥7 or any axis scores 3 → T3**.
 3. **DISPATCH** — self-contained brief: OBJECTIVE / CONTEXT / FILES /
    CONSTRAINTS / ACCEPTANCE / REPORT. No dispatch without acceptance criteria.
 4. **VERIFY** — review every artifact and diff against acceptance; run the

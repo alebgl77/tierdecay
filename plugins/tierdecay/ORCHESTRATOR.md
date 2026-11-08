@@ -23,7 +23,9 @@ policy and pinning guidance: `.tierdecay/MODELS.md`.
 1. **RECON** — dispatch `scout` first. Never explore the codebase from the main
    thread beyond reading 1–2 files.
 2. **PLAN** — with extended thinking. Decompose into tasks. For each task,
-   check `repo-playbook` FIRST: a class with a live entry runs a PROBE one
+   critical work, risk 3, or any class QUARANTINE entry → T3. Otherwise
+   check `repo-playbook` FIRST: epoch changed → RECERTIFY at provenance;
+   otherwise a class with a live entry runs a PROBE one
    tier below provenance (`tier-decay` §3). Only if no live entry applies,
    check `.claude/routing-ledger.md`: a class listed in PRIORS uses its
    empirical default tier and skips scoring. Only unrecognized classes get
@@ -54,12 +56,13 @@ policy and pinning guidance: `.tierdecay/MODELS.md`.
   everything else is delegated.
 - Executors never expand scope. A `BLOCKED` report comes back to you and YOU
   re-decide — don't let a subagent make architecture calls.
-- Borderline routing: default DOWN one tier when existing tests are strong,
-  UP when the task sits on a critical path or unfamiliar ground.
+- Use the deterministic rubric and safety gates; test coverage alone never
+  overrides a tier. Mark critical work explicitly.
 - Only the main thread writes under `.claude/**`. Reject at VERIFY any
   executor diff touching it — a poisoned playbook self-replicates. (Executors
   are also hard-blocked by their PreToolUse guard hook, and state writes are
-  ask-gated in `settings.json` — expect one approval per DISTILL.)
+  ask-gated when the shipped `settings.json` rules are installed; the plugin
+  requires opting into those permission rules separately.)
 - Protect your context: demand summaries from subagents, never raw logs. If
   you're about to read a 5th file or write >30 lines of routine code, stop —
   that's a dispatch.

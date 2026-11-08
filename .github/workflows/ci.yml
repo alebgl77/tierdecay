@@ -263,6 +263,7 @@ jobs:
           node tests/test-posterior.js
           node tests/test-production.js
           node tests/test-adapters.js
+          node tests/test-coherence.js
 
   conformance:
     name: Protocol conformance
@@ -330,7 +331,7 @@ jobs:
                      adapters/goose/AGENTS.md adapters/windsurf/AGENTS.md \
                      adapters/cursor/AGENTS.md adapters/codex/AGENTS.md \
                      adapters/antigravity/.agents/rules/tierdecay.md)
-          need=("150" "QUARANTINE" "verb-object-surface" "PROTOCOL.md" "any axis maxed")
+          need=("150" "QUARANTINE" "verb-object-surface" "PROTOCOL.md" "any axis scores 3")
           for f in "${nonnative[@]}"; do
             for tok in "${need[@]}"; do
               grep -qF "$tok" "$f" || { echo "::error::$f is missing normative token: $tok"; exit 1; }
@@ -352,6 +353,7 @@ jobs:
           print(f"parsed {len(files)} TOML and 2 JSON files")
           PY
           node tests/test-adapters.js
+          node tests/test-coherence.js
 
   docs:
     name: Docs integrity (offline)

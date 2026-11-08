@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="650" viewBox="0 0 1120 650" role="img" aria-labelledby="title desc">
+<title id="title">Illustrative TierDecay cumulative cost</title>
+<desc id="desc">Hypothetical costs over five occurrences: static 1, 2, 3, 4, 5; TierDecay 1.1, 1.3, 1.5, 1.7, 1.9. Distillation costs 0.1 and every lower-tier reuse succeeds. This is not measured evidence.</desc>
+<rect width="1120" height="650" fill="#FFFFFF"/>
+<rect x="20" y="16" width="1080" height="52" fill="#2B3A4A"/><text x="40" y="34.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#FFFFFF" text-anchor="start" dominant-baseline="central">When reuse recovers the upfront work</text><text x="40" y="56.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#C9D6E3" text-anchor="start" dominant-baseline="central">Illustrative cumulative cost · normalized units · not a benchmark</text>
+<text x="65" y="108.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="400" fill="#1F2D3D" text-anchor="start" dominant-baseline="central">High-tier solve = 1.0</text>
+<text x="420" y="108.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="400" fill="#1F2D3D" text-anchor="start" dominant-baseline="central">Lower-tier reuse = 0.2</text>
+<text x="800" y="108.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="400" fill="#1F2D3D" text-anchor="start" dominant-baseline="central">Distillation = 0.1</text>
+<text x="65" y="144.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#1F2D3D" text-anchor="start" dominant-baseline="central">Every reuse passes in this example; retries and escalations increase actual cost.</text>
+<line x1="100" y1="495" x2="920" y2="495" stroke="#DCE4EE"/>
+<text x="75" y="495.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#1F2D3D" text-anchor="end" dominant-baseline="central">0</text>
+<line x1="100" y1="434" x2="920" y2="434" stroke="#DCE4EE"/>
+<text x="75" y="434.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#1F2D3D" text-anchor="end" dominant-baseline="central">1</text>
+<line x1="100" y1="373" x2="920" y2="373" stroke="#DCE4EE"/>
+<text x="75" y="373.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#1F2D3D" text-anchor="end" dominant-baseline="central">2</text>
+<line x1="100" y1="312" x2="920" y2="312" stroke="#DCE4EE"/>
+<text x="75" y="312.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#1F2D3D" text-anchor="end" dominant-baseline="central">3</text>
+<line x1="100" y1="251" x2="920" y2="251" stroke="#DCE4EE"/>
+<text x="75" y="251.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#1F2D3D" text-anchor="end" dominant-baseline="central">4</text>
+<line x1="100" y1="190" x2="920" y2="190" stroke="#DCE4EE"/>
+<text x="75" y="190.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#1F2D3D" text-anchor="end" dominant-baseline="central">5</text>
+<polyline points="100,434 305,373 510,312 715,251 920,190" fill="none" stroke="#A66A12" stroke-width="4"/>
+<circle cx="100" cy="434" r="6" fill="#A66A12" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="305" cy="373" r="6" fill="#A66A12" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="510" cy="312" r="6" fill="#A66A12" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="715" cy="251" r="6" fill="#A66A12" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="920" cy="190" r="6" fill="#A66A12" stroke="#FFFFFF" stroke-width="2"/>
+<text x="940" y="178.9" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#A66A12" text-anchor="start" dominant-baseline="central">Static</text><text x="940" y="201.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#A66A12" text-anchor="start" dominant-baseline="central">5.0 units</text>
+<polyline points="100,427.9 305,415.7 510,403.5 715,391.3 920,379.1" fill="none" stroke="#32764B" stroke-width="4"/>
+<circle cx="100" cy="427.9" r="6" fill="#32764B" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="305" cy="415.7" r="6" fill="#32764B" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="510" cy="403.5" r="6" fill="#32764B" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="715" cy="391.3" r="6" fill="#32764B" stroke="#FFFFFF" stroke-width="2"/>
+<circle cx="920" cy="379.1" r="6" fill="#32764B" stroke="#FFFFFF" stroke-width="2"/>
+<text x="940" y="368.1" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#32764B" text-anchor="start" dominant-baseline="central">TierDecay</text><text x="940" y="390.2" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#32764B" text-anchor="start" dominant-baseline="central">1.9 units</text>
+<text x="100" y="525.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#1F2D3D" text-anchor="middle" dominant-baseline="central">1 · initial</text>
+<text x="305" y="525.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#1F2D3D" text-anchor="middle" dominant-baseline="central">2</text>
+<text x="510" y="525.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#1F2D3D" text-anchor="middle" dominant-baseline="central">3</text>
+<text x="715" y="525.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#1F2D3D" text-anchor="middle" dominant-baseline="central">4</text>
+<text x="920" y="525.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#1F2D3D" text-anchor="middle" dominant-baseline="central">5</text>
+<text x="510" y="558.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17" font-weight="400" fill="#1F2D3D" text-anchor="middle" dominant-baseline="central">Task occurrence (one initial solve, then four reuses)</text>
+<text x="65" y="604.0" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#1F2D3D" text-anchor="start" dominant-baseline="central">Break-even: the first reuse, only under these assumptions. No universal savings claim.</text>
+</svg>

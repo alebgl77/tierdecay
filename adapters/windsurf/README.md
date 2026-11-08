@@ -14,7 +14,7 @@ one-time read, also drop the file under `.devin/rules/` (legacy fallback
 |-----------|--------------------|
 | T3 | Top "Thinking"/Max Claude Opus-class model in the chat dropdown, or hand the task to the cloud Devin agent via ACP |
 | T2 | Mid-tier Claude Sonnet "Thinking" model |
-| T1 / T0 | Cheapest fast default in the dropdown — check the live list in your build |
+| T1 / T0 | Fast workhorse in the dropdown — check the live list in your build |
 
 No CLI flag, env var, or config file was found that sets a default model
 non-interactively — binding a tier means picking it in the dropdown per

@@ -16,14 +16,14 @@ const FONT = "'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 const MONO = "'Cascadia Mono', Consolas, 'DejaVu Sans Mono', monospace";
 const STYLE = {
   client: { fill: '#F5F5F5', stroke: '#666666' },
-  surface: { fill: '#DAE8FC', stroke: '#6C8EBF' },
-  engine: { fill: '#D5E8D4', stroke: '#82B366' },
-  state: { fill: '#FFF2CC', stroke: '#D6B656' },
+  surface: { fill: '#DDF3F2', stroke: '#167B80' },
+  engine: { fill: '#E3F3E9', stroke: '#32764B' },
+  state: { fill: '#FFF0CF', stroke: '#A66A12' },
   danger: { fill: '#F8CECC', stroke: '#B85450' },
   accent: { fill: '#E1D5E7', stroke: '#9673A6' },
-  tier3: { fill: '#F8CECC', stroke: '#B85450' },
-  tier2: { fill: '#FFE6CC', stroke: '#D79B00' },
-  tier1: { fill: '#D5E8D4', stroke: '#82B366' },
+  tier3: { fill: '#FFF0CF', stroke: '#A66A12' },
+  tier2: { fill: '#DDF3F2', stroke: '#167B80' },
+  tier1: { fill: '#E3F3E9', stroke: '#32764B' },
   neutral: { fill: '#FFFFFF', stroke: '#666666' }
 };
 
@@ -40,7 +40,7 @@ function textBlock(x, y, lines, { size = 13, weight = 400, color = '#1F2D3D', an
 
 function box(x, y, w, h, kind, lines, { rx = 6, size = 13, dashed = false } = {}) {
   const style = STYLE[kind];
-  return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${style.fill}" stroke="${style.stroke}" stroke-width="1.5"${dashed ? ' stroke-dasharray="6 4"' : ''} filter="url(#shadow)"/>${textBlock(x + w / 2, y + h / 2, lines, { size })}</g>`;
+  return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${style.fill}" stroke="${style.stroke}" stroke-width="1.5"${dashed ? ' stroke-dasharray="6 4"' : ''}/>${textBlock(x + w / 2, y + h / 2, lines, { size })}</g>`;
 }
 
 function pill(x, y, w, h, kind, lines, options = {}) {
@@ -50,13 +50,13 @@ function pill(x, y, w, h, kind, lines, options = {}) {
 function diamond(cx, cy, w, h, kind, lines, { size = 12 } = {}) {
   const style = STYLE[kind];
   const points = [[cx, cy - h / 2], [cx + w / 2, cy], [cx, cy + h / 2], [cx - w / 2, cy]].map((p) => p.join(',')).join(' ');
-  return `<g><polygon points="${points}" fill="${style.fill}" stroke="${style.stroke}" stroke-width="1.5" filter="url(#shadow)"/>${textBlock(cx, cy, lines, { size })}</g>`;
+  return `<g><polygon points="${points}" fill="${style.fill}" stroke="${style.stroke}" stroke-width="1.5"/>${textBlock(cx, cy, lines, { size })}</g>`;
 }
 
 function document(x, y, w, h, kind, lines, { size = 13 } = {}) {
   const style = STYLE[kind];
   const wave = `M${x},${y} H${x + w} V${y + h - 8} C${x + w * 0.75},${y + h - 22} ${x + w * 0.5},${y + h + 6} ${x + w * 0.25},${y + h - 6} C${x + w * 0.12},${y + h - 12} ${x + w * 0.05},${y + h - 10} ${x},${y + h - 6} Z`;
-  return `<g><path d="${wave}" fill="${style.fill}" stroke="${style.stroke}" stroke-width="1.5" filter="url(#shadow)"/>${textBlock(x + w / 2, y + h / 2 - 5, lines, { size })}</g>`;
+  return `<g><path d="${wave}" fill="${style.fill}" stroke="${style.stroke}" stroke-width="1.5"/>${textBlock(x + w / 2, y + h / 2 - 5, lines, { size })}</g>`;
 }
 
 function arrow(points, { label, dashed = false, color = '#4D4D4D', labelAt = 0.5, labelDx = 0, labelDy = -9, end = true, start = false } = {}) {
@@ -74,7 +74,15 @@ function arrow(points, { label, dashed = false, color = '#4D4D4D', labelAt = 0.5
     const width = String(label).length * 6.3 + 10;
     tag = `<rect x="${(lx - width / 2).toFixed(1)}" y="${(ly - 9).toFixed(1)}" width="${width.toFixed(1)}" height="18" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>${textBlock(lx, ly, label, { size: 11, color: '#333333' })}`;
   }
-  return `<g><path d="${d}" fill="none" stroke="${color}" stroke-width="1.6"${dashed ? ' stroke-dasharray="6 4"' : ''}${end ? ' marker-end="url(#arrow)"' : ''}${start ? ' marker-start="url(#arrow-start)"' : ''}/>${tag}</g>`;
+  // Explicit arrowheads also render in SVG readers without marker support.
+  const head = (tip, previous) => {
+    const angle = Math.atan2(tip[1] - previous[1], tip[0] - previous[0]);
+    const bx = tip[0] - 9 * Math.cos(angle);
+    const by = tip[1] - 9 * Math.sin(angle);
+    const corners = [tip, [bx - 3.5 * Math.sin(angle), by + 3.5 * Math.cos(angle)], [bx + 3.5 * Math.sin(angle), by - 3.5 * Math.cos(angle)]];
+    return `<polygon points="${corners.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ')}" fill="${color}"/>`;
+  };
+  return `<g><path d="${d}" fill="none" stroke="${color}" stroke-width="1.6"${dashed ? ' stroke-dasharray="6 4"' : ''}/>${end ? head(points.at(-1), points.at(-2)) : ''}${start ? head(points[0], points[1]) : ''}${tag}</g>`;
 }
 
 function lane(y, h, width, title, { shade = '#F7F9FC' } = {}) {
@@ -91,7 +99,7 @@ function titleBlock(width, height, title, sheet) {
 <line x1="${x + 290}" y1="${y + 26}" x2="${x + 290}" y2="${y + 58}" stroke="#2B3A4A" stroke-width="0.8"/>
 ${textBlock(x + 190, y + 13, title, { size: 12, weight: 700 })}
 ${textBlock(x + 95, y + 42, `TierDecay v${VERSION}`, { size: 11 })}
-${textBlock(x + 240, y + 42, 'Rev. 2026-10', { size: 11 })}
+${textBlock(x + 240, y + 42, 'Rev. 2026-11', { size: 11 })}
 ${textBlock(x + 335, y + 42, sheet, { size: 11 })}
 </g>`;
 }
@@ -101,7 +109,7 @@ function legend(x, y, items) {
   items.forEach(([kind, label, shape], index) => {
     const cx = x + (index % 4) * 175;
     const cy = y + 14 + Math.floor(index / 4) * 22;
-    if (shape === 'line') parts.push(`<line x1="${cx}" y1="${cy + 7}" x2="${cx + 26}" y2="${cy + 7}" stroke="#4D4D4D" stroke-width="1.6"${kind === 'dashed' ? ' stroke-dasharray="6 4"' : ''} marker-end="url(#arrow)"/>`);
+    if (shape === 'line') parts.push(arrow([[cx, cy + 7], [cx + 26, cy + 7]], { dashed: kind === 'dashed' }));
     else parts.push(`<rect x="${cx}" y="${cy}" width="26" height="14" rx="3" fill="${STYLE[kind].fill}" stroke="${STYLE[kind].stroke}" stroke-width="1.2"/>`);
     parts.push(`<text x="${cx + 34}" y="${cy + 7}" font-family="${FONT}" font-size="11" fill="#333333" dominant-baseline="central">${esc(label)}</text>`);
   });
@@ -113,14 +121,7 @@ function svg(width, height, title, description, body) {
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc">
 <title id="title">${esc(title)}</title>
 <desc id="desc">${esc(description)}</desc>
-<defs>
-<marker id="arrow" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4D4D4D"/></marker>
-<marker id="arrow-start" viewBox="0 0 10 10" refX="0.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4D4D4D"/></marker>
-<filter id="shadow" x="-10%" y="-10%" width="130%" height="140%"><feDropShadow dx="1.5" dy="2" stdDeviation="1.6" flood-color="#000000" flood-opacity="0.18"/></filter>
-<pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20,0 L0,0 0,20" fill="none" stroke="#EEF1F5" stroke-width="1"/></pattern>
-</defs>
 <rect width="${width}" height="${height}" fill="#FFFFFF"/>
-<rect width="${width}" height="${height}" fill="url(#grid)"/>
 ${body}
 </svg>
 `;
@@ -140,7 +141,7 @@ function architecture() {
     [86, 150, 'Agent clients'],
     [246, 170, 'Integration surfaces'],
     [426, 170, 'Deterministic engine'],
-    [606, 170, 'Repository state'],
+    [606, 170, 'State and references'],
     [786, 100, 'Operations (Linux)']
   ];
   lanes.forEach(([y, h, t], i) => parts.push(lane(y, h, W, t, { shade: i % 2 ? '#FFFFFF' : '#F7F9FC' })));
@@ -202,23 +203,24 @@ function architecture() {
   parts.push(arrow([[mid(2) - 70, 466], [mid(2) - 70, 448], [mid(1) + 20, 448], [mid(1) + 20, 372]], { dashed: true }));
 
   const state = [
-    ['SPEC rubric', 'cold-start prior'],
+    ['SPEC rubric', 'fixed rubric reference'],
     ['ledger.md', 'posterior: predicted vs executed'],
     ['playbook.md', 'compiled patterns · ≤150 lines'],
     ['MODELS.md', 'alias × effort · binding epoch'],
     ['router-config.json', 'calibrated economics'],
-    ['SECURITY · guard', 'executors never write state']
+    ['SECURITY · guard', 'blocks known state writes']
   ];
   state.forEach(([name, sub], i) => parts.push(document(col[i], 650, cw, 86, i === 5 ? 'danger' : 'state', [{ text: name, weight: 700, mono: i > 0 && i < 5 }, { text: sub, size: 11 }])));
 
-  // Bus C: the engine reads all state on every call (no cache, no daemon).
+  // Bus C: load learned state and optional economics, not the reference docs.
   const busC = 586;
   [0, 1, 2, 3, 4].forEach((i) => parts.push(`<line x1="${mid(i)}" y1="556" x2="${mid(i)}" y2="${busC}" stroke="#4D4D4D" stroke-width="1.6"/>`));
   parts.push(`<line x1="${mid(0)}" y1="${busC}" x2="${mid(4)}" y2="${busC}" stroke="#4D4D4D" stroke-width="3"/>`);
-  [0, 1, 2, 3, 4].forEach((i) => parts.push(arrow([[mid(i) - 30, busC], [mid(i) - 30, 650]])));
+  [1, 2, 4].forEach((i) => parts.push(arrow([[mid(i) - 30, busC], [mid(i) - 30, 650]])));
   parts.push(`<rect x="${mid(0) + 10}" y="${busC + 8}" width="210" height="18" rx="3" fill="#FFFFFF"/>`);
-  parts.push(textBlock(mid(0) + 115, busC + 17, 'reads on every call · no cache', { size: 11, color: '#333333' }));
-  // observe: the one write path.
+  parts.push(textBlock(mid(0) + 115, busC + 17, 'state loaded per command', { size: 11, color: '#333333' }));
+  parts.push(textBlock(W / 2, 758, 'SPEC and MODELS guide the agent; engine inputs are ledger, playbook and optional economics config.', { size: 11, color: '#4A5A6A' }));
+  // observe: the learned-state append path (exports write derived files).
   parts.push(arrow([[mid(5), 556], [mid(5), 620], [mid(1) + 40, 620], [mid(1) + 40, 650]], { dashed: true, label: 'append (lock + fsync + rename)', labelAt: 0.5, labelDy: -10 }));
 
   const ops = [
@@ -289,12 +291,14 @@ function routing() {
   const lastDecision = x0 + 160 + 4 * step + 30;
   parts.push(box(rubricX - 20, y - 38, 190, 76, 'neutral', [{ text: 'Score the rubric', weight: 700 }, { text: 'ambiguity · depth', size: 11 }, { text: 'blast radius · risk', size: 11 }]));
   parts.push(arrow([[lastDecision + 69, y], [rubricX - 20, y]], { label: 'no' }));
-  const tiers = [['tier1', 'T1 · score 0–3', 'executor'], ['tier2', 'T2 · score 4–6', 'heavy executor'], ['tier3', 'T3 · ≥7 or axis max', 'spec · implement · review']];
+  const tiers = [['tier1', 'T1 · score 0–3', 'executor'], ['tier2', 'T2 · score 4–6', 'heavy executor'], ['tier3', 'T3 · ≥7 or axis = 3', 'spec · implement · review']];
   tiers.forEach(([kind, title, sub], i) => {
     const ty = y + 100 + i * 92;
     parts.push(box(rubricX - 10, ty, 170, 62, kind, [{ text: title, weight: 700 }, { text: sub, size: 11 }]));
     parts.push(arrow([[rubricX + 170, y + 20], [rubricX + 200, y + 20], [rubricX + 200, ty + 31], [rubricX + 160, ty + 31]], {}));
   });
+
+  parts.push(textBlock(740, 660, 'Sticky floors also clamp PRIORS and rubric routes. T1 is the execution floor; T0 is read-only.', { size: 13, color: '#4A5A6A' }));
 
   // After execution: verify and distill loop.
   const loopY = y + 600;
@@ -373,7 +377,63 @@ function lifecycle() {
   return svg(W, H, 'TierDecay class lifecycle', 'States of a task class: scored by the rubric, distilled into a playbook entry, probed one tier lower, decayed after 3/4/5 passes by risk, quarantined with a sticky floor on any failure, recertified after a model or effort change, raised after two escalations.', parts.join('\n'));
 }
 
-const DIAGRAMS = { 'architecture.svg': architecture, 'routing-decision.svg': routing, 'decay-lifecycle.svg': lifecycle };
+// Reader-facing diagrams share the tier palette with the technical drawings.
+// These are exact diagrams, not generated illustrations or benchmark evidence.
+function stateOverview() {
+  const parts = [header(1120, 'Three files, one learning loop', 'The protocol sets the rules. Repository history supplies the evidence.')];
+  const cards = [
+    ['SPEC', 'Cold-start rules', 'Score unfamiliar task classes.', 'Safety gates always apply.', 'surface'],
+    ['LEDGER', 'Observed outcomes', 'Record predicted and executed tiers.', 'Build class-specific defaults.', 'state'],
+    ['PLAYBOOK', 'Reusable instructions', 'Quote the proven steps in the brief.', 'Probe one tier lower, then verify.', 'engine']
+  ];
+  cards.forEach(([name, role, line1, line2, style], i) => {
+    const x = 35 + i * 365;
+    parts.push(box(x, 108, 320, 182, style, [
+      { text: name, size: 24, weight: 700 },
+      { text: role, size: 18, weight: 600 },
+      { text: line1, size: 15 },
+      { text: line2, size: 15 }
+    ], { size: 21, rx: 10 }));
+    parts.push(arrow([[x + 160, 290], [x + 160, 330], [560, 330], [560, 358]]));
+  });
+  parts.push(box(280, 360, 560, 76, 'neutral', ['One deterministic advisor', 'CLI · MCP · exported routing tables'], { size: 19, rx: 10 }));
+  parts.push(textBlock(560, 474, 'Safety → quarantine → recertify → playbook → priors → rubric', { size: 17, weight: 600 }));
+  parts.push(textBlock(560, 512, 'The orchestrator verifies outcomes and updates the ledger and playbook.', { size: 16 }));
+  return svg(1120, 550, 'TierDecay state and interfaces', 'SPEC, LEDGER and PLAYBOOK feed one advisor exposed through CLI, MCP and routing exports. The orchestrator verifies work and updates learned state.', parts.join('\n'));
+}
+
+function economics() {
+  const W = 1120, H = 650;
+  const left = 100, top = 190, right = 920, bottom = 495;
+  const hi = 1, lo = 0.2, distill = 0.1;
+  const x = (occurrence) => left + (occurrence - 1) * (right - left) / 4;
+  const y = (cost) => bottom - cost * (bottom - top) / 5;
+  const parts = [header(W, 'When reuse recovers the upfront work', 'Illustrative cumulative cost · normalized units · not a benchmark')];
+  parts.push(textBlock(65, 108, 'High-tier solve = 1.0', { size: 18, anchor: 'start' }));
+  parts.push(textBlock(420, 108, 'Lower-tier reuse = 0.2', { size: 18, anchor: 'start' }));
+  parts.push(textBlock(800, 108, 'Distillation = 0.1', { size: 18, anchor: 'start' }));
+  parts.push(textBlock(65, 144, 'Every reuse passes in this example; retries and escalations increase actual cost.', { size: 16, anchor: 'start' }));
+  for (let cost = 0; cost <= 5; cost++) {
+    parts.push(`<line x1="${left}" y1="${y(cost)}" x2="${right}" y2="${y(cost)}" stroke="#DCE4EE"/>`);
+    parts.push(textBlock(left - 25, y(cost), String(cost), { size: 16, anchor: 'end' }));
+  }
+  const series = [
+    { label: 'Static', color: STYLE.tier3.stroke, values: [1, 2, 3, 4, 5] },
+    { label: 'TierDecay', color: STYLE.tier1.stroke, values: [1, 2, 3, 4, 5].map((n) => hi + distill + (n - 1) * lo) }
+  ];
+  for (const line of series) {
+    parts.push(`<polyline points="${line.values.map((v, i) => `${x(i + 1)},${y(v)}`).join(' ')}" fill="none" stroke="${line.color}" stroke-width="4"/>`);
+    line.values.forEach((v, i) => parts.push(`<circle cx="${x(i + 1)}" cy="${y(v)}" r="6" fill="${line.color}" stroke="#FFFFFF" stroke-width="2"/>`));
+    const last = line.values[4];
+    parts.push(textBlock(right + 20, y(last), [`${line.label}`, `${last.toFixed(1)} units`], { size: 17, weight: 600, anchor: 'start', color: line.color }));
+  }
+  for (let n = 1; n <= 5; n++) parts.push(textBlock(x(n), bottom + 30, n === 1 ? '1 · initial' : String(n), { size: 16 }));
+  parts.push(textBlock(510, 558, 'Task occurrence (one initial solve, then four reuses)', { size: 17 }));
+  parts.push(textBlock(65, 604, 'Break-even: the first reuse, only under these assumptions. No universal savings claim.', { size: 17, weight: 600, anchor: 'start' }));
+  return svg(W, H, 'Illustrative TierDecay cumulative cost', 'Hypothetical costs over five occurrences: static 1, 2, 3, 4, 5; TierDecay 1.1, 1.3, 1.5, 1.7, 1.9. Distillation costs 0.1 and every lower-tier reuse succeeds. This is not measured evidence.', parts.join('\n'));
+}
+
+const DIAGRAMS = { 'architecture.svg': architecture, 'routing-decision.svg': routing, 'decay-lifecycle.svg': lifecycle, 'state-overview.svg': stateOverview, 'economics.svg': economics };
 
 function main(check) {
   const stale = [];

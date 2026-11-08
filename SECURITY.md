@@ -27,9 +27,8 @@ there.
 TierDecay is markdown instruction files plus a Bash `install.sh` that copies
 those files into your repository. There is no network service or runtime
 daemon, no telemetry, and no secret handling — so the usual server-side and
-credential surfaces do not apply here. The Claude Code adapter's local guard
-hook requires Node.js to parse tool payloads; it is the only adapter-specific
-runtime requirement and does not run as a service. Three surfaces are real and
+credential surfaces do not apply here. The Claude Code and Codex adapters share a local guard
+hook requiring Node.js to parse tool payloads; it does not run as a service. Three surfaces are real and
 in scope:
 
 **1. `install.sh` file operations.** The installer runs in your shell with
